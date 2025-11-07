@@ -1,0 +1,85 @@
+name: build-motorola-kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+
+    steps:
+      - name: Checkout (workflow repo)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc flex bison libssl-dev libncurses-dev zlib1g-dev \
+            git curl jq python3 python3-distutils \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu lld llvm
+
+      - name: Clone Motorola kernel at tag
+        run: |
+          git clone --depth 1 --branch MMI-T1TGNS33.60-41-2-7 https://github.com/MotorolaMobilityLLC/kernel-msm.git upstream-kernel
+
+      - name: Prepare linker wrapper
+        run: |
+          mkdir -p ~/tmp-ld
+          if [ -x /usr/bin/aarch64-linux-gnu-ld ]; then
+            ln -sf /usr/bin/aarch64-linux-gnu-ld ~/tmp-ld/aarch64-linux-gnu-ld
+          elif command -v ld.lld >/dev/null 2>&1; then
+            ln -sf "$(command -v ld.lld)" ~/tmp-ld/aarch64-linux-gnu-ld
+          fi
+          export PATH=~/tmp-ld:$PATH
+
+      - name: Provide device kernel (from repo or releases)
+        id: provide_kernel
+        run: |
+          mkdir -p upstream-kernel/out/device-kernel
+          if [ -f "./device-kernel/device-kernel.img" ]; then
+            echo "Found device kernel in repo at ./device-kernel/device-kernel.img"
+            cp ./device-kernel/device-kernel.img upstream-kernel/out/device-kernel/device-kernel.img
+            echo "source=repo" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "Looking for release asset device-kernel.img"
+          API_URL="https://api.github.com/repos/${{ github.repository }}/releases/latest"
+          ASSET_URL=$(curl -s "$API_URL" | jq -r '.assets[] | select(.name == "device-kernel.img") | .url' || true)
+          if [ -n "$ASSET_URL" ] && [ "$ASSET_URL" != "null" ]; then
+            echo "Downloading release asset..."
+            curl -L -H "Accept: application/octet-stream" -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -o upstream-kernel/out/device-kernel/device-kernel.img "$ASSET_URL"
+            echo "source=release" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          echo "No device kernel provided (repo or release). Continuing without it." >> $GITHUB_OUTPUT
+
+      - name: Build kernel (Image.gz, dtbs, modules)
+        run: |
+          cd upstream-kernel
+          export PATH=~/tmp-ld:$PATH
+          export ARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          make -j$(nproc) O=out Image.gz dtbs modules 2>&1 | tee build.log || true
+
+      - name: Upload build.log
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: upstream-kernel/build.log
+
+      - name: Upload build artifacts (out directory)
+        uses: actions/upload-artifact@v4
+        with:
+          name: kernel-out
+          path: upstream-kernel/out
+
+      - name: Upload provided device kernel (if present)
+        if: steps.provide_kernel.outputs.source != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-kernel
+          path: upstream-kernel/out/device-kernel/device-kernel.imgEOF
