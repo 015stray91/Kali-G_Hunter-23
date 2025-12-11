@@ -1,0 +1,29 @@
+# Temporary directories created by scripts
+tmp-collect/
+device-configs/
+
+# Build artifacts
+*.o
+*.ko
+*.img
+*.zip
+*.gz
+*.xz
+*.tar
+*.bz2
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Node modules
+node_modules/

@@ -1,0 +1,83 @@
+name: collect-device-configs
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - 'ci/**'
+  pull_request:
+
+jobs:
+  collect-configs:
+    runs-on: ubuntu-22.04
+    container:
+      image: kalilinux/kali-rolling:latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Install essential packages in Kali container
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            git \
+            curl \
+            ca-certificates \
+            xz-utils \
+            tar \
+            findutils \
+            coreutils \
+            bash
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run device config collection script
+        run: |
+          bash scripts/collect-device-configs.sh
+
+      - name: List collected configurations
+        if: always()
+        run: |
+          echo "===== Collected Device Configurations ====="
+          if [ -d "$GITHUB_WORKSPACE/device-configs" ]; then
+            ls -lah "$GITHUB_WORKSPACE/device-configs/"
+            echo ""
+            echo "===== Summary ====="
+            if [ -f "$GITHUB_WORKSPACE/device-configs/collection-summary.txt" ]; then
+              cat "$GITHUB_WORKSPACE/device-configs/collection-summary.txt"
+            fi
+            echo ""
+            echo "===== Directory Structure ====="
+            find "$GITHUB_WORKSPACE/device-configs" -type d | sort
+            echo ""
+            echo "===== File Count by Directory ====="
+            for dir in "$GITHUB_WORKSPACE/device-configs"/*; do
+              if [ -d "$dir" ]; then
+                count=$(find "$dir" -type f | wc -l)
+                echo "  $(basename $dir): $count files"
+              fi
+            done
+          else
+            echo "No device-configs directory found"
+          fi
+
+      - name: Upload collected device configurations
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-configs
+          path: device-configs/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload device metadata
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-metadata
+          path: device-metadata.md
+          if-no-files-found: warn
+          retention-days: 30
