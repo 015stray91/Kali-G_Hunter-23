@@ -11,6 +11,8 @@ on:
 jobs:
   collect-configs:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: read
     container:
       image: kalilinux/kali-rolling:latest
     timeout-minutes: 60
