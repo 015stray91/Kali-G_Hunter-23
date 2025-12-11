@@ -6,6 +6,12 @@ on:
 jobs:
   build:
     runs-on: ubuntu-22.04
+    # NOTE: For production use, consider switching to a self-hosted Kali runner:
+    # runs-on: [self-hosted, linux, kali]
+    # This would eliminate container overhead and provide a native Kali environment.
+    container:
+      image: kalilinux/kali-rolling
+      options: --privileged
     timeout-minutes: 180
 
     steps:
@@ -14,13 +20,49 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install build dependencies
+      - name: Install build dependencies (Kali packages)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential bc flex bison libssl-dev libncurses-dev zlib1g-dev \
-            git curl jq python3 python3-distutils \
-            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu lld llvm
+          # Update package lists
+          apt-get update
+          
+          # Install Kali packages non-interactively
+          DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            debos bmap-tools f2fs-tools python3-distutils qemu-utils \
+            parted squashfs-tools rsync ca-certificates curl git golang-go \
+            build-essential make pkg-config libssl-dev bc \
+            flex bison libncurses-dev zlib1g-dev \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu jq
+          
+          # Try to install clang-12 and lld-12, fall back to generic versions if unavailable
+          # NOTE: For production builds, consider pinning a specific LLVM tarball in a follow-up PR
+          # to ensure reproducible builds across different environments.
+          if apt-cache show clang-12 >/dev/null 2>&1; then
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends clang-12 lld-12
+            echo "Installed clang-12 and lld-12"
+          else
+            echo "WARNING: clang-12/lld-12 not available, falling back to generic clang/lld"
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends clang lld || true
+            # If even generic versions fail, try llvm
+            if ! command -v clang >/dev/null 2>&1; then
+              echo "WARNING: clang not found, installing llvm package"
+              DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends llvm || true
+            fi
+          fi
+
+      - name: Collect device configs from upstream repos
+        run: |
+          chmod +x ./scripts/collect-device-configs.sh
+          ./scripts/collect-device-configs.sh \
+            --repos "https://github.com/PizzaG/Build-Env-Setup-Scripts.git https://github.com/PizzaG/android_vendor_motorola_yume.git https://github.com/PizzaG/android_device_motorola_yume.git https://github.com/sosRR/platform_kernel_motorola_genevn.git" \
+            --kernel-url "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.233.tar.xz" \
+            || echo "Device config collection completed with warnings (exit code: $?)"
+
+      - name: Upload device configs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-configs
+          path: device-configs/
+
 
       - name: Clone Motorola kernel at tag
         run: |
@@ -82,4 +124,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: device-kernel
-          path: upstream-kernel/out/device-kernel/device-kernel.imgEOF
+          path: upstream-kernel/out/device-kernel/device-kernel.img
+
