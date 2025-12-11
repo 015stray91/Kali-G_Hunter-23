@@ -78,7 +78,7 @@ if [ -n "$REPOS" ]; then
         repo_name=$(basename "$repo" .git)
         log "Cloning $repo_name..."
         
-        if git clone --depth 1 "$repo" "$WORK_DIR/$repo_name" 2>/dev/null; then
+        if git clone --depth 1 "$repo" "$WORK_DIR/$repo_name" 2>&1 | grep -v "^Cloning"; then
             log "Successfully cloned $repo_name"
             
             # Copy relevant files to output directory
@@ -104,7 +104,7 @@ if [ -n "$REPOS" ]; then
                     -name "device.mk" -o \
                     -name "vendor.mk" -o \
                     -name "AndroidProducts.mk" \
-                \) -exec cp --parents {} "$OUTPUT_DIR/$repo_name/" \; 2>/dev/null || true
+                \) -exec cp --parents {} "$OUTPUT_DIR/$repo_name/" \; 2>&1 | grep -i "error" || true
                 
                 log "Collected config files from $repo_name"
             fi
@@ -119,7 +119,7 @@ if [ -n "$KERNEL_TARBALL" ]; then
     log "Downloading kernel tarball from $KERNEL_TARBALL..."
     tarball_name=$(basename "$KERNEL_TARBALL")
     
-    if curl -L -o "$WORK_DIR/$tarball_name" "$KERNEL_TARBALL" 2>/dev/null; then
+    if curl -L --progress-bar -o "$WORK_DIR/$tarball_name" "$KERNEL_TARBALL"; then
         log "Successfully downloaded $tarball_name"
         
         # Extract and collect kernel configs
@@ -127,7 +127,11 @@ if [ -n "$KERNEL_TARBALL" ]; then
         mkdir -p "$tar_dir"
         
         log "Extracting kernel tarball..."
-        tar -xf "$WORK_DIR/$tarball_name" -C "$tar_dir" --strip-components=1 2>/dev/null || true
+        if tar -xf "$WORK_DIR/$tarball_name" -C "$tar_dir" --strip-components=1 2>&1 | grep -i "error" || true; then
+            log "Kernel tarball extracted"
+        else
+            log "Kernel extraction may have had issues, continuing..."
+        fi
         
         # Copy kernel configuration files
         mkdir -p "$OUTPUT_DIR/kernel-configs"
@@ -136,7 +140,7 @@ if [ -n "$KERNEL_TARBALL" ]; then
             -name "*.config" -o \
             -name "Kconfig*" -o \
             -name "Makefile" \
-        \) -path "*/arch/arm64/*" -exec cp --parents {} "$OUTPUT_DIR/kernel-configs/" \; 2>/dev/null || true
+        \) -path "*/arch/arm64/*" -exec cp --parents {} "$OUTPUT_DIR/kernel-configs/" \; 2>&1 | grep -i "error" || true
         
         log "Collected kernel config files"
     else

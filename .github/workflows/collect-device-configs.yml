@@ -165,7 +165,7 @@ jobs:
 
       - name: Create environment summary
         run: |
-          cat > device-configs/ENVIRONMENT.txt << 'EOF'
+          cat > device-configs/ENVIRONMENT.txt << EOF
           Build Environment Setup Summary
           ================================
           Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
@@ -194,19 +194,33 @@ jobs:
         run: |
           echo "Initializing build environment for subsequent kernel builds..."
           
+          # Detect LLVM path dynamically
+          LLVM_PATH=""
+          for version in 14 15 16 17 18; do
+            if [ -d "/usr/lib/llvm-${version}/bin" ]; then
+              LLVM_PATH="/usr/lib/llvm-${version}/bin"
+              break
+            fi
+          done
+          
+          if [ -z "$LLVM_PATH" ]; then
+            LLVM_PATH="/usr/bin"
+            echo "Warning: LLVM-specific path not found, using /usr/bin"
+          fi
+          
           # Set up toolchain paths
-          export PATH=/usr/lib/llvm-14/bin:$PATH
+          export PATH=${LLVM_PATH}:$PATH
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
           
           # Create build environment info
-          cat > device-configs/BUILD_ENV.sh << 'EOF'
+          cat > device-configs/BUILD_ENV.sh << EOF
           # Build Environment Variables
           # Source this file in subsequent build steps: source device-configs/BUILD_ENV.sh
           
           export ARCH=arm64
           export CROSS_COMPILE=aarch64-linux-gnu-
-          export PATH=/usr/lib/llvm-14/bin:$PATH
+          export PATH=${LLVM_PATH}:\$PATH
           export LLVM=1
           
           # Device-specific
@@ -215,11 +229,13 @@ jobs:
           export PLATFORM=genevn
           
           echo "Build environment initialized for Motorola Yume (genevn)"
+          echo "LLVM path: ${LLVM_PATH}"
           EOF
           
           chmod +x device-configs/BUILD_ENV.sh
           
           echo "Build environment ready"
+          echo "LLVM path: ${LLVM_PATH}"
 
       - name: Upload device-configs artifact
         uses: actions/upload-artifact@v4
