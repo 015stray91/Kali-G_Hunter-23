@@ -5,8 +5,19 @@ on:
 
 jobs:
   build:
+    # To use a self-hosted Kali runner instead, change this line to:
+    # runs-on: [self-hosted, linux, kali]
+    # and remove the container block below.
+    # To revert to the previous ubuntu runner, change this to:
+    # runs-on: ubuntu-22.04
+    # and remove the container block below.
     runs-on: ubuntu-22.04
     timeout-minutes: 180
+    
+    # Run the job inside a Kali Linux container
+    container:
+      image: kalilinux/kali-rolling
+      options: --privileged
 
     steps:
       - name: Checkout (workflow repo)
@@ -14,13 +25,62 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install build dependencies
+      - name: Install Kali dependencies and toolchain
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            build-essential bc flex bison libssl-dev libncurses-dev zlib1g-dev \
-            git curl jq python3 python3-distutils \
-            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu lld llvm
+          # Install required Kali packages and Android kernel build toolchain
+          # Target: clang 12.0.5 and lld 12.0.5 (matching build host)
+          export DEBIAN_FRONTEND=noninteractive
+          
+          apt-get update
+          
+          # Install base build dependencies and Kali-specific tools
+          apt-get install -y --no-install-recommends \
+            debos bmap-tools f2fs-tools python3-distutils qemu-utils parted \
+            squashfs-tools rsync ca-certificates curl git golang-go \
+            build-essential make pkg-config libssl-dev bc \
+            flex bison libncurses-dev zlib1g-dev jq \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu gcc-arm-none-eabi || true
+          
+          # Attempt to install clang-12 and lld-12 specifically
+          echo "Attempting to install clang-12 and lld-12..."
+          apt-get install -y --no-install-recommends clang-12 lld-12 || {
+            echo "WARNING: clang-12 or lld-12 not available in kali-rolling repositories"
+            echo "Falling back to latest clang and lld versions"
+            echo "This may cause version mismatch with expected clang 12.0.5 / lld 12.0.5"
+            apt-get install -y --no-install-recommends clang lld || true
+          }
+          
+          # Verify toolchain installation
+          echo "Checking installed toolchain versions:"
+          if command -v clang-12 &>/dev/null; then
+            clang-12 --version
+            # Create symlinks if needed
+            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100 || true
+            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-12 100 || true
+          else
+            clang --version || echo "clang not found"
+          fi
+          
+          if command -v lld-12 &>/dev/null; then
+            lld-12 --version
+            update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/lld-12 100 || true
+          else
+            lld --version || echo "lld not found"
+          fi
+          
+          # Alternative: Use prebuilt LLVM toolchain with exact version
+          # If you need exactly clang 12.0.5 / lld 12.0.5 (build c935d99d7cf...):
+          # Uncomment and adjust the following lines:
+          #
+          # LLVM_VERSION="12.0.5"
+          # LLVM_TARBALL_URL="https://example.com/path/to/clang+llvm-12.0.5-x86_64-linux-gnu.tar.xz"
+          # curl -L -o /tmp/llvm-toolchain.tar.xz "$LLVM_TARBALL_URL"
+          # mkdir -p /opt/llvm-toolchain
+          # tar -xf /tmp/llvm-toolchain.tar.xz -C /opt/llvm-toolchain --strip-components=1
+          # export PATH="/opt/llvm-toolchain/bin:$PATH"
+          # export LD_LIBRARY_PATH="/opt/llvm-toolchain/lib:$LD_LIBRARY_PATH"
+          # clang --version
+          # lld --version
 
       - name: Clone Motorola kernel at tag
         run: |
