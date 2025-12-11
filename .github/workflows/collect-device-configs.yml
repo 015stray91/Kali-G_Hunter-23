@@ -14,6 +14,19 @@ jobs:
   collect-configs:
     runs-on: ubuntu-22.04
     timeout-minutes: 60
+    
+    env:
+      REPOS: >-
+        https://github.com/PizzaG/Build-Env-Setup-Scripts.git,
+        https://github.com/PizzaG/android_vendor_motorola_yume.git,
+        https://github.com/PizzaG/android_device_motorola_yume.git,
+        https://github.com/sosRR/platform_kernel_motorola_genevn.git,
+        https://gitlab.com/kalilinux/nethunter/nh-resources.git,
+        https://gitlab.com/kalilinux/nethunter/nh-scripts.git,
+        https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-installer.git,
+        https://gitlab.com/akabulous/So_You_Want_To_Build_A_Nethunter_Kernel.git,
+        https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-pro.git
+      KERNEL_URL: https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.233.tar.xz
 
     steps:
       - name: Checkout repository
@@ -26,13 +39,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             git curl ca-certificates xz-utils \
-            build-essential bc flex bison
+            build-essential bc flex bison tree
 
       - name: Run device config collection script
         run: |
           bash scripts/collect-device-configs.sh \
-            --repos "https://github.com/PizzaG/Build-Env-Setup-Scripts.git,https://github.com/PizzaG/android_vendor_motorola_yume.git,https://github.com/PizzaG/android_device_motorola_yume.git,https://github.com/sosRR/platform_kernel_motorola_genevn.git,https://gitlab.com/kalilinux/nethunter/nh-resources.git,https://gitlab.com/kalilinux/nethunter/nh-scripts.git,https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-installer.git,https://gitlab.com/akabulous/So_You_Want_To_Build_A_Nethunter_Kernel.git,https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-pro.git" \
-            --kernel-url "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.233.tar.xz" \
+            --repos "${{ env.REPOS }}" \
+            --kernel-url "${{ env.KERNEL_URL }}" \
             --output-dir "device-configs-collected"
 
       - name: List collected configurations
@@ -44,7 +57,12 @@ jobs:
           cat device-configs-collected/device-metadata.txt || echo "Metadata file not found"
           echo ""
           echo "=== Directory Structure ==="
-          tree -L 3 device-configs-collected || find device-configs-collected -type d | head -20
+          if command -v tree >/dev/null 2>&1; then
+            tree -L 3 device-configs-collected
+          else
+            echo "Directory structure:"
+            find device-configs-collected -type d | sort | head -20
+          fi
 
       - name: Upload collected configurations
         uses: actions/upload-artifact@v4

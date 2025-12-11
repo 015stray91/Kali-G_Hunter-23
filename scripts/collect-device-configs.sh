@@ -124,13 +124,19 @@ if [ -d "$WORK_DIR/Build-Env-Setup-Scripts" ]; then
     cd "$WORK_DIR/Build-Env-Setup-Scripts"
     
     # Check for setup scripts
-    if [ -f "setup.sh" ]; then
+    if [ -f "setup.sh" ] && [ -x "setup.sh" ]; then
         echo "Running setup.sh..."
+        bash setup.sh || echo "Warning: setup.sh exited with non-zero status"
+    elif [ -f "setup.sh" ]; then
+        echo "setup.sh found but not executable, attempting to run with bash..."
         bash setup.sh || echo "Warning: setup.sh exited with non-zero status"
     fi
     
-    if [ -f "install-toolchain.sh" ]; then
+    if [ -f "install-toolchain.sh" ] && [ -x "install-toolchain.sh" ]; then
         echo "Running install-toolchain.sh..."
+        bash install-toolchain.sh || echo "Warning: install-toolchain.sh exited with non-zero status"
+    elif [ -f "install-toolchain.sh" ]; then
+        echo "install-toolchain.sh found but not executable, attempting to run with bash..."
         bash install-toolchain.sh || echo "Warning: install-toolchain.sh exited with non-zero status"
     fi
     
@@ -184,7 +190,9 @@ if [ -d "android_device_motorola_yume" ]; then
     echo "Collecting from android_device_motorola_yume..."
     mkdir -p "$OUTPUT_DIR/device"
     find android_device_motorola_yume -name "*.mk" -o -name "*.prop" -o -name "*.rc" -o -name "BoardConfig*.mk" -o -name "device.mk" | while read -r file; do
-        cp --parents "$file" "$OUTPUT_DIR/device/" 2>/dev/null || true
+        dest_file="$OUTPUT_DIR/device/$file"
+        mkdir -p "$(dirname "$dest_file")"
+        cp "$file" "$dest_file" 2>/dev/null || true
     done
 fi
 
@@ -193,7 +201,9 @@ if [ -d "android_vendor_motorola_yume" ]; then
     echo "Collecting from android_vendor_motorola_yume..."
     mkdir -p "$OUTPUT_DIR/vendor"
     find android_vendor_motorola_yume -name "*.mk" -o -name "*.prop" | while read -r file; do
-        cp --parents "$file" "$OUTPUT_DIR/vendor/" 2>/dev/null || true
+        dest_file="$OUTPUT_DIR/vendor/$file"
+        mkdir -p "$(dirname "$dest_file")"
+        cp "$file" "$dest_file" 2>/dev/null || true
     done
 fi
 
@@ -204,12 +214,16 @@ if [ -d "platform_kernel_motorola_genevn" ]; then
     
     # Copy defconfig files
     find platform_kernel_motorola_genevn -name "*defconfig*" -o -name ".config" | while read -r file; do
-        cp --parents "$file" "$OUTPUT_DIR/kernel/" 2>/dev/null || true
+        dest_file="$OUTPUT_DIR/kernel/$file"
+        mkdir -p "$(dirname "$dest_file")"
+        cp "$file" "$dest_file" 2>/dev/null || true
     done
     
     # Copy kernel makefiles
     find platform_kernel_motorola_genevn -maxdepth 2 -name "Makefile" -o -name "Kconfig" | while read -r file; do
-        cp --parents "$file" "$OUTPUT_DIR/kernel/" 2>/dev/null || true
+        dest_file="$OUTPUT_DIR/kernel/$file"
+        mkdir -p "$(dirname "$dest_file")"
+        cp "$file" "$dest_file" 2>/dev/null || true
     done
 fi
 
