@@ -1,0 +1,85 @@
+name: collect-device-configs
+
+on:
+  workflow_dispatch:
+    inputs:
+      additional_repos:
+        description: 'Comma-separated list of additional repositories to check'
+        required: false
+        default: ''
+  push:
+    branches:
+      - main
+      - ci/**
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  collect-configs:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git curl jq ca-certificates
+
+      - name: Run device config collection script
+        run: |
+          if [ -n "${{ github.event.inputs.additional_repos }}" ]; then
+            ./scripts/collect-device-configs.sh --repos "${{ github.event.inputs.additional_repos }}"
+          else
+            ./scripts/collect-device-configs.sh
+          fi
+
+      - name: Display collection summary
+        run: |
+          echo "=== Collection Summary ==="
+          cat device-configs-artifact/collection-summary.txt
+
+      - name: Upload device configurations artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-configs
+          path: device-configs-artifact/
+          retention-days: 30
+
+      - name: Upload device configs (device directory)
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-configs-device
+          path: device-configs-artifact/device/
+          retention-days: 30
+
+      - name: Upload kernel configs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-configs-kernel
+          path: device-configs-artifact/kernel/
+          retention-days: 30
+
+      - name: Upload NetHunter configs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-configs-nethunter
+          path: device-configs-artifact/nethunter/
+          retention-days: 30
+
+      - name: Upload toolchain info
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: device-configs-toolchain
+          path: device-configs-artifact/toolchain/
+          retention-days: 30
