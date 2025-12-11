@@ -78,7 +78,7 @@ for repo_url in "${REPOS[@]}"; do
     clone_path="${TMP_DIR}/${repo_name}"
     
     log_info "Cloning ${repo_url}..."
-    if git clone --depth 1 "${repo_url}" "${clone_path}"; then
+    if git clone --depth 1 "${repo_url}" "${clone_path}" 2>&1 | tee /tmp/git-clone-error.log; then
         # Get commit SHA
         commit_sha=$(cd "${clone_path}" && git rev-parse HEAD)
         
@@ -91,21 +91,31 @@ for repo_url in "${REPOS[@]}"; do
         log_info "  Cloned ${repo_name} at commit ${commit_sha:0:8}"
     else
         log_error "Failed to clone ${repo_url}"
+        log_error "Git error output:"
+        cat /tmp/git-clone-error.log >&2
         exit 1
     fi
 done
 
 # Download kernel tarball
 log_info "Downloading kernel tarball from ${KERNEL_TARBALL_URL}..."
-if curl -L -o "${KERNEL_TARBALL}" "${KERNEL_TARBALL_URL}"; then
+if curl -L -f -S --show-error -o "${KERNEL_TARBALL}" "${KERNEL_TARBALL_URL}" 2>&1 | tee /tmp/curl-error.log; then
     log_info "  Downloaded to ${KERNEL_TARBALL}"
+    
+    # Verify download
+    if [ -f "${KERNEL_TARBALL}" ] && [ -s "${KERNEL_TARBALL}" ]; then
+        file_size=$(stat -f%z "${KERNEL_TARBALL}" 2>/dev/null || stat -c%s "${KERNEL_TARBALL}")
+        log_info "  File size: $((file_size / 1024 / 1024)) MB"
+    fi
     
     # Record in manifest
     echo "Kernel Tarball: ${KERNEL_TARBALL_URL}" >> "${MANIFEST_FILE}"
     echo "  Downloaded: ${KERNEL_TARBALL}" >> "${MANIFEST_FILE}"
     echo "" >> "${MANIFEST_FILE}"
 else
-    log_error "Failed to download kernel tarball"
+    log_error "Failed to download kernel tarball from ${KERNEL_TARBALL_URL}"
+    log_error "Curl error output:"
+    cat /tmp/curl-error.log >&2
     exit 1
 fi
 
