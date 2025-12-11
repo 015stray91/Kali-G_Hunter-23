@@ -142,6 +142,12 @@ copy_matching_files() {
     
     log_info "Searching for ${description} (${pattern})..."
     
+    # Check if source directory exists
+    if [ ! -d "${source_dir}" ]; then
+        log_warn "  Source directory ${source_dir} does not exist, skipping"
+        return 0
+    fi
+    
     # Create destination directory
     mkdir -p "${OUTPUT_DIR}/${dest_subdir}"
     
@@ -172,6 +178,12 @@ copy_matching_dirs() {
     local description="$4"
     
     log_info "Searching for ${description} directories (${pattern})..."
+    
+    # Check if source directory exists
+    if [ ! -d "${source_dir}" ]; then
+        log_warn "  Source directory ${source_dir} does not exist, skipping"
+        return 0
+    fi
     
     # Create destination directory
     mkdir -p "${OUTPUT_DIR}/${dest_subdir}"
