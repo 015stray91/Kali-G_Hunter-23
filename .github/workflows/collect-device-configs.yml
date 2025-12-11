@@ -1,0 +1,61 @@
+name: Collect Device & Kernel Configs
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ci/collect-device-configs
+  pull_request:
+    branches:
+      - main
+      - master
+
+jobs:
+  collect-configs:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git curl ca-certificates xz-utils \
+            build-essential bc flex bison
+
+      - name: Run device config collection script
+        run: |
+          bash scripts/collect-device-configs.sh \
+            --repos "https://github.com/PizzaG/Build-Env-Setup-Scripts.git,https://github.com/PizzaG/android_vendor_motorola_yume.git,https://github.com/PizzaG/android_device_motorola_yume.git,https://github.com/sosRR/platform_kernel_motorola_genevn.git,https://gitlab.com/kalilinux/nethunter/nh-resources.git,https://gitlab.com/kalilinux/nethunter/nh-scripts.git,https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-installer.git,https://gitlab.com/akabulous/So_You_Want_To_Build_A_Nethunter_Kernel.git,https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-pro.git" \
+            --kernel-url "https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.233.tar.xz" \
+            --output-dir "device-configs-collected"
+
+      - name: List collected configurations
+        run: |
+          echo "=== Collected Configuration Files ==="
+          find device-configs-collected -type f | head -50
+          echo ""
+          echo "=== Device Metadata ==="
+          cat device-configs-collected/device-metadata.txt || echo "Metadata file not found"
+          echo ""
+          echo "=== Directory Structure ==="
+          tree -L 3 device-configs-collected || find device-configs-collected -type d | head -20
+
+      - name: Upload collected configurations
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-kernel-configs
+          path: device-configs-collected/
+          retention-days: 30
+
+      - name: Upload metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-metadata
+          path: device-configs-collected/device-metadata.txt
+          retention-days: 90
