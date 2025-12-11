@@ -132,7 +132,7 @@ collect_files() {
           FOUND_DTS=1
         fi
       fi
-    done < <(cd "$source_dir" && find . -not -path './.git/*' -type f \( -path "./$pattern" -o -name "$(basename "$pattern")" \) 2>/dev/null | sed 's|^\./||')
+    done < <(cd "$source_dir" && find . -not -path './.git/*' -type f -path "./$pattern" 2>/dev/null | sed 's|^\./||')
   done
   
   # Add category to JSON index if files found
@@ -156,7 +156,7 @@ if [ -n "$REPOS" ]; then
     clone_dir="$WORK_DIR/$repo_name"
     
     echo "  Cloning: $repo"
-    if git clone --depth 1 "$repo" "$clone_dir" 2>&1; then
+    if git clone --depth 1 "$repo" "$clone_dir"; then
       cd "$clone_dir"
       commit_sha=$(git rev-parse HEAD)
       origin_url=$(git config --get remote.origin.url)
@@ -213,7 +213,7 @@ if [ -n "$KERNEL_URL" ]; then
   tarball_path="$WORK_DIR/$tarball_name"
   
   echo "  URL: $KERNEL_URL"
-  if curl -L -o "$tarball_path" "$KERNEL_URL" 2>&1; then
+  if curl -f -L -o "$tarball_path" "$KERNEL_URL"; then
     # Calculate checksum
     checksum=$(sha256sum "$tarball_path" | awk '{print $1}')
     echo "    SHA256: $checksum"
@@ -225,7 +225,7 @@ if [ -n "$KERNEL_URL" ]; then
     mkdir -p "$extract_dir"
     echo "  Extracting tarball..."
     
-    if tar -xf "$tarball_path" -C "$extract_dir" --strip-components=1 2>&1; then
+    if tar -xf "$tarball_path" -C "$extract_dir" --strip-components=1; then
       echo "Collecting files from linux-kernel..." >> "$MANIFEST_FILE"
       
       # Collect kernel config files
