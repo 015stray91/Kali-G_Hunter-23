@@ -1,0 +1,12 @@
+# Temporary directories
+tmp-clone/
+linux-kernel/
+
+# Downloaded files
+kernel.tar.xz
+
+# Collected configs (these should be artifacts, not committed)
+device-configs/
+
+# Test files
+/tmp/
