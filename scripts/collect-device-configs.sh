@@ -56,6 +56,24 @@ echo "=== Device Configuration Collection Script ==="
 echo "Output directory: ${OUTPUT_DIR}"
 echo ""
 
+# Function to copy config files safely
+copy_config_files() {
+    local source_dir="$1"
+    local dest_dir="$2"
+    local pattern="${3:-*.config *defconfig}"
+    
+    local files_copied=0
+    find "${source_dir}" -type f \( -name "*.config" -o -name "*defconfig" \) 2>/dev/null | while read -r config_file; do
+        if cp "${config_file}" "${dest_dir}/" 2>/dev/null; then
+            echo "✓ Copied $(basename "${config_file}")"
+            files_copied=$((files_copied + 1))
+        else
+            echo "⚠ Warning: Failed to copy $(basename "${config_file}")" >&2
+        fi
+    done
+    return 0
+}
+
 # Function to try cloning a repository
 try_clone_repo() {
     local repo_url="$1"
@@ -64,13 +82,19 @@ try_clone_repo() {
     local timeout="${4:-30}"
     
     echo "Attempting to clone: ${repo_url}"
-    if timeout "${timeout}" git clone --depth "${depth}" "${repo_url}" "${dest_dir}" 2>&1 | grep -v "Username\|Password"; then
+    
+    # Disable interactive prompts to prevent credential requests
+    export GIT_TERMINAL_PROMPT=0
+    
+    if timeout "${timeout}" git clone --depth "${depth}" "${repo_url}" "${dest_dir}" 2>&1; then
         if [ -d "${dest_dir}/.git" ]; then
             echo "✓ Successfully cloned ${repo_url}"
+            unset GIT_TERMINAL_PROMPT
             return 0
         fi
     fi
     echo "✗ Failed to clone ${repo_url}"
+    unset GIT_TERMINAL_PROMPT
     return 1
 }
 
@@ -85,19 +109,25 @@ collect_nethunter_configs() {
             # Look for device configurations
             if [ -d "${temp_dir}/devices" ]; then
                 echo "Found devices directory, copying configurations..."
-                cp -r "${temp_dir}/devices"/* "${OUTPUT_DIR}/nethunter/" 2>/dev/null || true
+                if cp -r "${temp_dir}/devices"/* "${OUTPUT_DIR}/nethunter/" 2>/dev/null; then
+                    echo "✓ Copied device configurations"
+                else
+                    echo "⚠ Warning: Some device configs failed to copy" >&2
+                fi
             fi
             
             # Look for kernel configurations
             if [ -d "${temp_dir}/kernel-configs" ]; then
                 echo "Found kernel-configs directory, copying..."
-                cp -r "${temp_dir}/kernel-configs"/* "${OUTPUT_DIR}/kernel/" 2>/dev/null || true
+                if cp -r "${temp_dir}/kernel-configs"/* "${OUTPUT_DIR}/kernel/" 2>/dev/null; then
+                    echo "✓ Copied kernel configurations"
+                else
+                    echo "⚠ Warning: Some kernel configs failed to copy" >&2
+                fi
             fi
             
             # Copy any .config or defconfig files
-            find "${temp_dir}" -name "*.config" -o -name "*defconfig" | while read -r config_file; do
-                cp "${config_file}" "${OUTPUT_DIR}/kernel/" 2>/dev/null || true
-            done
+            copy_config_files "${temp_dir}" "${OUTPUT_DIR}/kernel"
             
             rm -rf "${temp_dir}"
             echo "✓ NetHunter configurations collected"
@@ -173,27 +203,33 @@ collect_local_device_files() {
         
         # Copy kernel binary
         if [ -f "device-kernel/kernel" ]; then
-            cp "device-kernel/kernel" "${OUTPUT_DIR}/device/kernel-image"
-            echo "✓ Copied kernel image"
+            if cp "device-kernel/kernel" "${OUTPUT_DIR}/device/kernel-image" 2>/dev/null; then
+                echo "✓ Copied kernel image"
+            else
+                echo "⚠ Warning: Failed to copy kernel image" >&2
+            fi
         fi
         
         # Look for any config files
-        find device-kernel -name "*.config" -o -name "*defconfig" | while read -r config_file; do
-            cp "${config_file}" "${OUTPUT_DIR}/device/" 2>/dev/null || true
-            echo "✓ Copied $(basename ${config_file})"
-        done
+        copy_config_files "device-kernel" "${OUTPUT_DIR}/device"
     fi
     
     # Collect any device tree files
     if [ -d "device-tree" ]; then
-        cp -r device-tree/* "${OUTPUT_DIR}/device/" 2>/dev/null || true
-        echo "✓ Copied device tree files"
+        if cp -r device-tree/* "${OUTPUT_DIR}/device/" 2>/dev/null; then
+            echo "✓ Copied device tree files"
+        else
+            echo "⚠ Warning: Failed to copy some device tree files" >&2
+        fi
     fi
     
     # Collect README and documentation
     if [ -f "README.md" ]; then
-        cp "README.md" "${OUTPUT_DIR}/device/README.md"
-        echo "✓ Copied README.md"
+        if cp "README.md" "${OUTPUT_DIR}/device/README.md" 2>/dev/null; then
+            echo "✓ Copied README.md"
+        else
+            echo "⚠ Warning: Failed to copy README.md" >&2
+        fi
     fi
 }
 
@@ -210,9 +246,7 @@ process_additional_repos() {
                 local temp_dir=$(mktemp -d)
                 if try_clone_repo "${repo}" "${temp_dir}"; then
                     # Copy any relevant files
-                    find "${temp_dir}" -name "*.config" -o -name "*defconfig" | while read -r config_file; do
-                        cp "${config_file}" "${OUTPUT_DIR}/device/" 2>/dev/null || true
-                    done
+                    copy_config_files "${temp_dir}" "${OUTPUT_DIR}/device"
                 fi
                 rm -rf "${temp_dir}"
             fi
