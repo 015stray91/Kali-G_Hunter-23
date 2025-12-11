@@ -189,7 +189,7 @@ cd "$WORK_DIR"
 if [ -d "android_device_motorola_yume" ]; then
     echo "Collecting from android_device_motorola_yume..."
     mkdir -p "$OUTPUT_DIR/device"
-    find android_device_motorola_yume -name "*.mk" -o -name "*.prop" -o -name "*.rc" -o -name "BoardConfig*.mk" -o -name "device.mk" | while read -r file; do
+    find android_device_motorola_yume -name "*.mk" -o -name "*.prop" -o -name "*.rc" | while read -r file; do
         dest_file="$OUTPUT_DIR/device/$file"
         mkdir -p "$(dirname "$dest_file")"
         cp "$file" "$dest_file" 2>/dev/null || true
