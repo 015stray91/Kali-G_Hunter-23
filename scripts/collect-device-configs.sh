@@ -61,7 +61,7 @@ for repo in $REPOS; do
   echo "  -> Cloning to: $target_dir"
   
   # Clone with depth 1 for faster download
-  if git clone --depth 1 "$repo" "$target_dir" 2>&1; then
+  if git clone --depth 1 "$repo" "$target_dir" >/dev/null 2>&1; then
     echo "  -> Successfully cloned $repo_name"
     
     # Remove .git directory to save space
@@ -88,8 +88,11 @@ for repo in $REPOS; do
 done
 echo "" >> "$summary_file"
 echo "Directory structure:" >> "$summary_file"
-tree -L 2 "$DEVICE_CONFIGS_DIR" >> "$summary_file" 2>/dev/null || \
-  find "$DEVICE_CONFIGS_DIR" -maxdepth 2 -type d >> "$summary_file"
+if command -v tree >/dev/null 2>&1; then
+  tree -L 2 "$DEVICE_CONFIGS_DIR" >> "$summary_file" 2>/dev/null
+else
+  find "$DEVICE_CONFIGS_DIR" -maxdepth 2 -type d | sort >> "$summary_file"
+fi
 echo "" >> "$summary_file"
 echo "Total files collected: $(find "$DEVICE_CONFIGS_DIR" -type f | wc -l)" >> "$summary_file"
 echo "Total size: $(du -sh "$DEVICE_CONFIGS_DIR" | cut -f1)" >> "$summary_file"

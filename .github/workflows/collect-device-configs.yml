@@ -35,19 +35,39 @@ jobs:
           cd nethunter-setup
           
           echo "Cloning NetHunter resources..."
-          git clone --depth 1 https://gitlab.com/kalilinux/nethunter/nh-resources.git || true
+          if git clone --depth 1 https://gitlab.com/kalilinux/nethunter/nh-resources.git; then
+            echo "  ✓ nh-resources cloned successfully"
+          else
+            echo "  ✗ Failed to clone nh-resources"
+          fi
           
           echo "Cloning NetHunter scripts..."
-          git clone --depth 1 https://gitlab.com/kalilinux/nethunter/nh-scripts.git || true
+          if git clone --depth 1 https://gitlab.com/kalilinux/nethunter/nh-scripts.git; then
+            echo "  ✓ nh-scripts cloned successfully"
+          else
+            echo "  ✗ Failed to clone nh-scripts"
+          fi
           
           echo "Cloning NetHunter installer..."
-          git clone --depth 1 https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-installer.git || true
+          if git clone --depth 1 https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-installer.git; then
+            echo "  ✓ kali-nethunter-installer cloned successfully"
+          else
+            echo "  ✗ Failed to clone kali-nethunter-installer"
+          fi
           
           echo "Cloning NetHunter kernel build guide..."
-          git clone --depth 1 https://gitlab.com/akabulous/So_You_Want_To_Build_A_Nethunter_Kernel.git || true
+          if git clone --depth 1 https://gitlab.com/akabulous/So_You_Want_To_Build_A_Nethunter_Kernel.git; then
+            echo "  ✓ Build guide cloned successfully"
+          else
+            echo "  ✗ Failed to clone build guide"
+          fi
           
           echo "Cloning NetHunter Pro..."
-          git clone --depth 1 https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-pro.git || true
+          if git clone --depth 1 https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-pro.git; then
+            echo "  ✓ kali-nethunter-pro cloned successfully"
+          else
+            echo "  ✗ Failed to clone kali-nethunter-pro"
+          fi
           
           cd ..
           
@@ -64,13 +84,13 @@ jobs:
             echo "nethunter_status=partial" >> $GITHUB_OUTPUT
           else
             echo "NetHunter installer not fully available"
-            echo "nethunter_status=failed" >> $GITHUB_OUTPUT
+            echo "nethunter_status=unavailable" >> $GITHUB_OUTPUT
             exit 1
           fi
       
       # Step 2: Fallback to PizzaG Build-Env-Setup-Scripts
       - name: Fallback to PizzaG Build-Env provisioning
-        if: steps.nethunter_install.outcome == 'failure' || steps.nethunter_install.outputs.nethunter_status == 'failed'
+        if: steps.nethunter_install.outcome == 'failure'
         run: |
           echo "=== NetHunter provisioning failed, falling back to PizzaG Build-Env ==="
           
@@ -220,7 +240,7 @@ jobs:
         run: |
           echo "=== Generating collection manifest ==="
           
-          cat > device-configs/MANIFEST.txt << 'EOF'
+          cat > device-configs/MANIFEST.txt << EOF
           === Device Configuration Collection Manifest ===
           
           This artifact contains device, kernel, vendor, and NetHunter-related

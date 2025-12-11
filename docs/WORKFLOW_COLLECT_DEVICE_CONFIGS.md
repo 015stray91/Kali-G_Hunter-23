@@ -72,7 +72,7 @@ The complete `device-configs/` directory is uploaded as a GitHub Actions artifac
 
 ## Artifact Structure
 
-\`\`\`
+```
 device-configs/
 ├── vendor/
 │   └── android_vendor_motorola_yume/
@@ -94,7 +94,7 @@ device-configs/
 ├── collection-summary.txt
 ├── build-env-setup.txt
 └── MANIFEST.txt
-\`\`\`
+```
 
 ## Using the Artifact
 
@@ -106,7 +106,7 @@ To use the collected configurations in a subsequent kernel build job:
 4. Use the environment variables already set in `$GITHUB_ENV`
 
 Example:
-\`\`\`yaml
+```yaml
 - name: Download device configs
   uses: actions/download-artifact@v4
   with:
@@ -118,20 +118,20 @@ Example:
     # Environment variables are already set
     cd device-configs/kernel/platform_kernel_motorola_genevn
     make -j$(nproc) Image.gz dtbs modules
-\`\`\`
+```
 
 ## Script Usage
 
 The `collect-device-configs.sh` script can also be run manually:
 
-\`\`\`bash
+```bash
 ./scripts/collect-device-configs.sh --repos "repo1 repo2 repo3..."
-\`\`\`
+```
 
 Example:
-\`\`\`bash
+```bash
 ./scripts/collect-device-configs.sh --repos "https://github.com/user/repo1.git https://github.com/user/repo2.git"
-\`\`\`
+```
 
 ## Build Environment Details
 
