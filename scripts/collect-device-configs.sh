@@ -36,6 +36,8 @@ echo "Target directory: $DEVICE_CONFIGS_DIR"
 echo ""
 
 # Clone and collect files from each repository
+# Note: REPOS is expected to be a space-separated string from the --repos argument
+# Repository URLs should not contain spaces for this approach to work correctly
 for repo in $REPOS; do
   echo "Processing repository: $repo"
   

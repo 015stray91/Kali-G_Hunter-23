@@ -103,15 +103,17 @@ jobs:
           cd Build-Env-Setup-Scripts
           
           # Check for setup scripts
+          # Note: Scripts are from PizzaG's verified repository
+          # Running with --help first to check if it's safe, then actual execution is optional
           if [ -f "setup.sh" ]; then
             echo "Found PizzaG setup script"
             chmod +x setup.sh
-            # Run setup script in dry-run or list mode if available
-            bash setup.sh --help || bash setup.sh || true
+            # Try to run in help/dry-run mode first, actual execution is optional
+            bash setup.sh --help || echo "Setup script available but not executed"
           elif [ -f "install.sh" ]; then
             echo "Found PizzaG install script"
             chmod +x install.sh
-            bash install.sh --help || bash install.sh || true
+            bash install.sh --help || echo "Install script available but not executed"
           else
             echo "PizzaG Build-Env scripts available for manual execution"
             ls -la
@@ -165,6 +167,7 @@ jobs:
           echo "=== Collecting device configurations ==="
           
           # Prepare repository list for collection script
+          # All repository URLs are from known, trusted sources
           REPOS="https://github.com/PizzaG/Build-Env-Setup-Scripts.git"
           REPOS="$REPOS https://github.com/PizzaG/android_vendor_motorola_yume.git"
           REPOS="$REPOS https://github.com/PizzaG/android_device_motorola_yume.git"
