@@ -2,7 +2,7 @@
 
 ## Device Information
 - **Brand**: Motorola
-- **Model**: Moto G Stylus 5G (2020) / XT2315
+- **Model**: Moto G Stylus 5G (2020) / XT-2315
 - **Codename**: genevn / G_Hunter
 - **SoC**: Qualcomm SM6450 (Snapdragon 6 Gen 1)
 - **Architecture**: ARM64

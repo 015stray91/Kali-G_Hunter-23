@@ -75,6 +75,12 @@ for repo in "${REPOS[@]}"; do
   repo_name=$(basename "$repo" .git)
   echo "===== Cloning $repo_name ====="
   
+  # Validate repository URL (basic check for https://github.com)
+  if [[ ! "$repo" =~ ^https://github\.com/ ]]; then
+    echo "✗ Skipping $repo_name: Only GitHub HTTPS URLs are supported for security"
+    continue
+  fi
+  
   if git clone --depth 1 "$repo" "$TMP_COLLECT/$repo_name"; then
     echo "✓ Successfully cloned $repo_name"
     
@@ -85,20 +91,31 @@ for repo in "${REPOS[@]}"; do
     if [ -d "$TMP_COLLECT/$repo_name" ]; then
       # Find and copy configuration files, preserving structure relative to repo root
       cd "$TMP_COLLECT/$repo_name"
-      find . -type f \( \
-        -name "*.mk" -o \
-        -name "*.bp" -o \
-        -name "*.conf" -o \
-        -name "*.rc" -o \
-        -name "*defconfig*" -o \
-        -name "*.te" -o \
-        -name "*.xml" -o \
-        -name "*.prop" -o \
-        -name "*.sh" -o \
-        -name "Makefile" -o \
-        -name "Android.mk" -o \
-        -name "Android.bp" \
-      \) -exec sh -c 'mkdir -p "$1/$(dirname "$2")" && cp "$2" "$1/$2"' _ "$TARGET_DIR/$repo_name" {} \; || true
+      
+      # Create a function to copy files preserving directory structure
+      copy_configs() {
+        local target_base="$1"
+        find . -type f \( \
+          -name "*.mk" -o \
+          -name "*.bp" -o \
+          -name "*.conf" -o \
+          -name "*.rc" -o \
+          -name "*defconfig*" -o \
+          -name "*.te" -o \
+          -name "*.xml" -o \
+          -name "*.prop" -o \
+          -name "*.sh" -o \
+          -name "Makefile" -o \
+          -name "Android.mk" -o \
+          -name "Android.bp" \
+        \) | while read -r file; do
+          dest_dir="$target_base/$(dirname "$file")"
+          mkdir -p "$dest_dir"
+          cp "$file" "$dest_dir/" || true
+        done
+      }
+      
+      copy_configs "$TARGET_DIR/$repo_name"
       cd "$WORKSPACE"
       
       echo "✓ Copied configuration files from $repo_name"
@@ -113,38 +130,49 @@ done
 echo "===== Downloading Kernel Tarball ====="
 kernel_tarball="$TMP_COLLECT/$(basename "$KERNEL_URL")"
 
-if curl -L -o "$kernel_tarball" "$KERNEL_URL"; then
-  echo "✓ Downloaded kernel tarball"
-  
-  # Extract kernel tarball
-  kernel_extract_dir="$TMP_COLLECT/kernel-source"
-  mkdir -p "$kernel_extract_dir"
-  
-  echo "Extracting kernel tarball..."
-  if tar -xf "$kernel_tarball" -C "$kernel_extract_dir" --strip-components=1; then
-    echo "✓ Extracted kernel tarball"
-    
-    # Copy kernel config files
-    mkdir -p "$TARGET_DIR/kernel-configs"
-    
-    # Copy defconfig files and other relevant kernel configs
-    if [ -d "$kernel_extract_dir/arch/arm64/configs" ]; then
-      cp -r "$kernel_extract_dir/arch/arm64/configs" "$TARGET_DIR/kernel-configs/" || true
-    fi
-    
-    if [ -d "$kernel_extract_dir/arch/arm/configs" ]; then
-      cp -r "$kernel_extract_dir/arch/arm/configs" "$TARGET_DIR/kernel-configs/" || true
-    fi
-    
-    # Copy Kconfig files for reference
-    find "$kernel_extract_dir" -maxdepth 2 -name "Kconfig*" -exec cp {} "$TARGET_DIR/kernel-configs/" 2>/dev/null \; || true
-    
-    echo "✓ Copied kernel configuration files"
-  else
-    echo "✗ Failed to extract kernel tarball"
-  fi
+# Validate kernel URL (basic check for https://cdn.kernel.org)
+if [[ ! "$KERNEL_URL" =~ ^https://cdn\.kernel\.org/ ]]; then
+  echo "⚠ Warning: Kernel URL is not from cdn.kernel.org, skipping for security"
 else
-  echo "✗ Failed to download kernel tarball"
+  if curl -L --max-redirs 3 -o "$kernel_tarball" "$KERNEL_URL"; then
+    echo "✓ Downloaded kernel tarball"
+    
+    # Extract kernel tarball
+    kernel_extract_dir="$TMP_COLLECT/kernel-source"
+    mkdir -p "$kernel_extract_dir"
+    
+    echo "Extracting kernel tarball..."
+    if tar -xf "$kernel_tarball" -C "$kernel_extract_dir" --strip-components=1; then
+      echo "✓ Extracted kernel tarball"
+      
+      # Copy kernel config files
+      mkdir -p "$TARGET_DIR/kernel-configs"
+      
+      # Copy defconfig files and other relevant kernel configs
+      if [ -d "$kernel_extract_dir/arch/arm64/configs" ]; then
+        cp -r "$kernel_extract_dir/arch/arm64/configs" "$TARGET_DIR/kernel-configs/" || true
+      fi
+      
+      if [ -d "$kernel_extract_dir/arch/arm/configs" ]; then
+        cp -r "$kernel_extract_dir/arch/arm/configs" "$TARGET_DIR/kernel-configs/" || true
+      fi
+      
+      # Copy Kconfig files for reference, preserving paths to avoid overwrites
+      mkdir -p "$TARGET_DIR/kernel-configs/Kconfig-files"
+      find "$kernel_extract_dir" -maxdepth 2 -name "Kconfig*" | while read -r kconfig; do
+        # Preserve filename uniqueness by including parent dir
+        parent_dir=$(basename "$(dirname "$kconfig")")
+        filename=$(basename "$kconfig")
+        cp "$kconfig" "$TARGET_DIR/kernel-configs/Kconfig-files/${parent_dir}_${filename}" 2>/dev/null || true
+      done
+      
+      echo "✓ Copied kernel configuration files"
+    else
+      echo "✗ Failed to extract kernel tarball"
+    fi
+  else
+    echo "✗ Failed to download kernel tarball"
+  fi
 fi
 echo ""
 
