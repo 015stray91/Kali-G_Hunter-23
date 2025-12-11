@@ -1,4 +1,13 @@
 name: build-motorola-kernel
+# This workflow runs kernel build inside a Kali Linux container (kalilinux/kali-rolling)
+# to match the target device build environment and ensure consistent package versions.
+#
+# Alternative configuration for self-hosted Kali runner:
+# Replace the 'runs-on' and remove 'container' block with:
+#   runs-on: [self-hosted, linux, kali]
+#
+# To revert to Ubuntu host (no container):
+# Remove the 'container' block below and use runs-on: ubuntu-22.04
 
 on:
   workflow_dispatch:
@@ -7,6 +16,10 @@ jobs:
   build:
     runs-on: ubuntu-22.04
     timeout-minutes: 180
+    # Run job inside Kali Linux container for proper build environment
+    container:
+      image: kalilinux/kali-rolling
+      options: --privileged
 
     steps:
       - name: Checkout (workflow repo)
@@ -14,13 +27,22 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install build dependencies
+      - name: Install Kali dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
+          export DEBIAN_FRONTEND=noninteractive
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            debos bmap-tools f2fs-tools clang lld python3-distutils \
+            qemu-utils parted squashfs-tools rsync ca-certificates curl git golang-go \
             build-essential bc flex bison libssl-dev libncurses-dev zlib1g-dev \
-            git curl jq python3 python3-distutils \
-            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu lld llvm
+            jq python3 gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu llvm
+          # Fallback: install debos via Go if apt install failed
+          if ! command -v debos &>/dev/null; then
+            export GOPATH=${GITHUB_WORKSPACE}/go
+            export PATH=$GOPATH/bin:$PATH
+            go install github.com/go-debos/debos@latest
+          fi
+          debos --version || true
 
       - name: Clone Motorola kernel at tag
         run: |
@@ -82,4 +104,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: device-kernel
-          path: upstream-kernel/out/device-kernel/device-kernel.imgEOF
+          path: upstream-kernel/out/device-kernel/device-kernel.img
