@@ -57,7 +57,7 @@ jobs:
             for dir in "$GITHUB_WORKSPACE/device-configs"/*; do
               if [ -d "$dir" ]; then
                 count=$(find "$dir" -type f | wc -l)
-                echo "  $(basename $dir): $count files"
+                echo "  $(basename "$dir"): $count files"
               fi
             done
           else

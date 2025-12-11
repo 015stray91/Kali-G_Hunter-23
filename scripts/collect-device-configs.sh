@@ -27,6 +27,11 @@ while [[ $# -gt 0 ]]; do
       done
       ;;
     --kernel-url)
+      if [[ $# -lt 2 ]] || [[ "$2" =~ ^-- ]]; then
+        echo "Error: --kernel-url requires a URL argument"
+        echo "Usage: $0 [--repos <repo1> <repo2> ...] [--kernel-url <url>]"
+        exit 1
+      fi
       KERNEL_URL="$2"
       shift 2
       ;;
@@ -157,13 +162,14 @@ else
         cp -r "$kernel_extract_dir/arch/arm/configs" "$TARGET_DIR/kernel-configs/" || true
       fi
       
-      # Copy Kconfig files for reference, preserving paths to avoid overwrites
+      # Copy Kconfig files for reference, preserving full paths to avoid overwrites
       mkdir -p "$TARGET_DIR/kernel-configs/Kconfig-files"
       find "$kernel_extract_dir" -maxdepth 2 -name "Kconfig*" | while read -r kconfig; do
-        # Preserve filename uniqueness by including parent dir
-        parent_dir=$(basename "$(dirname "$kconfig")")
-        filename=$(basename "$kconfig")
-        cp "$kconfig" "$TARGET_DIR/kernel-configs/Kconfig-files/${parent_dir}_${filename}" 2>/dev/null || true
+        # Preserve filename uniqueness by including full relative path
+        rel_path="${kconfig#$kernel_extract_dir/}"
+        # Replace / with _ to create flat but unique filenames
+        safe_name="${rel_path//\//_}"
+        cp "$kconfig" "$TARGET_DIR/kernel-configs/Kconfig-files/${safe_name}" 2>/dev/null || true
       done
       
       echo "✓ Copied kernel configuration files"
