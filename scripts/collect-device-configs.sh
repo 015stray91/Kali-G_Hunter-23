@@ -60,13 +60,10 @@ echo ""
 copy_config_files() {
     local source_dir="$1"
     local dest_dir="$2"
-    local pattern="${3:-*.config *defconfig}"
     
-    local files_copied=0
     find "${source_dir}" -type f \( -name "*.config" -o -name "*defconfig" \) 2>/dev/null | while read -r config_file; do
         if cp "${config_file}" "${dest_dir}/" 2>/dev/null; then
             echo "✓ Copied $(basename "${config_file}")"
-            files_copied=$((files_copied + 1))
         else
             echo "⚠ Warning: Failed to copy $(basename "${config_file}")" >&2
         fi

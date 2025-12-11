@@ -10,7 +10,7 @@ on:
   push:
     branches:
       - main
-      - ci/**
+      - 'ci/collect-device-configs*'
   pull_request:
     branches:
       - main
