@@ -104,7 +104,7 @@ if curl -L -f -S --show-error -o "${KERNEL_TARBALL}" "${KERNEL_TARBALL_URL}" 2>&
     
     # Verify download
     if [ -f "${KERNEL_TARBALL}" ] && [ -s "${KERNEL_TARBALL}" ]; then
-        file_size=$(stat -f%z "${KERNEL_TARBALL}" 2>/dev/null || stat -c%s "${KERNEL_TARBALL}")
+        file_size=$(stat -c%s "${KERNEL_TARBALL}")
         log_info "  File size: $((file_size / 1024 / 1024)) MB"
     fi
     
