@@ -34,38 +34,46 @@ jobs:
           apt-get update
           
           # Install base build dependencies and Kali-specific tools
+          # Core packages (required)
           apt-get install -y --no-install-recommends \
             debos bmap-tools f2fs-tools python3-distutils qemu-utils parted \
             squashfs-tools rsync ca-certificates curl git golang-go \
             build-essential make pkg-config libssl-dev bc \
             flex bison libncurses-dev zlib1g-dev jq \
-            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu gcc-arm-none-eabi || true
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu
+          
+          # Optional cross-compile tools (may not be in all Kali repos)
+          apt-get install -y --no-install-recommends gcc-arm-none-eabi || echo "gcc-arm-none-eabi not available, skipping"
           
           # Attempt to install clang-12 and lld-12 specifically
           echo "Attempting to install clang-12 and lld-12..."
-          apt-get install -y --no-install-recommends clang-12 lld-12 || {
+          if apt-get install -y --no-install-recommends clang-12 lld-12; then
+            echo "Successfully installed clang-12 and lld-12"
+          else
             echo "WARNING: clang-12 or lld-12 not available in kali-rolling repositories"
             echo "Falling back to latest clang and lld versions"
             echo "This may cause version mismatch with expected clang 12.0.5 / lld 12.0.5"
-            apt-get install -y --no-install-recommends clang lld || true
-          }
+            apt-get install -y --no-install-recommends clang lld
+          fi
           
           # Verify toolchain installation
           echo "Checking installed toolchain versions:"
           if command -v clang-12 &>/dev/null; then
             clang-12 --version
             # Create symlinks if needed
-            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100 || true
-            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-12 100 || true
+            if [ -x /usr/bin/clang++-12 ]; then
+              update-alternatives --install /usr/bin/clang clang /usr/bin/clang-12 100 || true
+              update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-12 100 || true
+            fi
           else
-            clang --version || echo "clang not found"
+            clang --version || echo "WARNING: clang not found"
           fi
           
           if command -v lld-12 &>/dev/null; then
             lld-12 --version
             update-alternatives --install /usr/bin/ld.lld ld.lld /usr/bin/lld-12 100 || true
           else
-            lld --version || echo "lld not found"
+            lld --version || echo "WARNING: lld not found"
           fi
           
           # Alternative: Use prebuilt LLVM toolchain with exact version
