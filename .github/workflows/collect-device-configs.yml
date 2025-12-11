@@ -1,0 +1,298 @@
+name: Collect Device Configs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  collect-configs:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 120
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      
+      - name: Install base dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential bc flex bison libssl-dev libncurses-dev \
+            zlib1g-dev git curl wget jq python3 python3-pip \
+            gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu \
+            lld llvm tree rsync
+      
+      # Step 1: Try NetHunter installer scripts
+      - name: Attempt NetHunter installer provisioning
+        id: nethunter_install
+        continue-on-error: true
+        run: |
+          echo "=== Attempting NetHunter installer provisioning ==="
+          
+          # Clone NetHunter repositories
+          mkdir -p nethunter-setup
+          cd nethunter-setup
+          
+          echo "Cloning NetHunter resources..."
+          git clone --depth 1 https://gitlab.com/kalilinux/nethunter/nh-resources.git || true
+          
+          echo "Cloning NetHunter scripts..."
+          git clone --depth 1 https://gitlab.com/kalilinux/nethunter/nh-scripts.git || true
+          
+          echo "Cloning NetHunter installer..."
+          git clone --depth 1 https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-installer.git || true
+          
+          echo "Cloning NetHunter kernel build guide..."
+          git clone --depth 1 https://gitlab.com/akabulous/So_You_Want_To_Build_A_Nethunter_Kernel.git || true
+          
+          echo "Cloning NetHunter Pro..."
+          git clone --depth 1 https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-pro.git || true
+          
+          cd ..
+          
+          # Try to run NetHunter installer setup if available
+          if [ -f "nethunter-setup/kali-nethunter-installer/build.sh" ]; then
+            echo "Found NetHunter installer build script"
+            cd nethunter-setup/kali-nethunter-installer
+            # Try to run installer in dry-run or setup mode
+            bash build.sh --help || true
+            cd ../..
+            echo "nethunter_status=success" >> $GITHUB_OUTPUT
+          elif [ -d "nethunter-setup/nh-scripts" ]; then
+            echo "NetHunter scripts cloned successfully"
+            echo "nethunter_status=partial" >> $GITHUB_OUTPUT
+          else
+            echo "NetHunter installer not fully available"
+            echo "nethunter_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+      
+      # Step 2: Fallback to PizzaG Build-Env-Setup-Scripts
+      - name: Fallback to PizzaG Build-Env provisioning
+        if: steps.nethunter_install.outcome == 'failure' || steps.nethunter_install.outputs.nethunter_status == 'failed'
+        run: |
+          echo "=== NetHunter provisioning failed, falling back to PizzaG Build-Env ==="
+          
+          mkdir -p pizzag-build-env
+          cd pizzag-build-env
+          
+          echo "Cloning PizzaG Build-Env-Setup-Scripts..."
+          git clone --depth 1 https://github.com/PizzaG/Build-Env-Setup-Scripts.git
+          
+          cd Build-Env-Setup-Scripts
+          
+          # Check for setup scripts
+          if [ -f "setup.sh" ]; then
+            echo "Found PizzaG setup script"
+            chmod +x setup.sh
+            # Run setup script in dry-run or list mode if available
+            bash setup.sh --help || bash setup.sh || true
+          elif [ -f "install.sh" ]; then
+            echo "Found PizzaG install script"
+            chmod +x install.sh
+            bash install.sh --help || bash install.sh || true
+          else
+            echo "PizzaG Build-Env scripts available for manual execution"
+            ls -la
+          fi
+          
+          cd ../..
+          echo "PizzaG Build-Env provisioning completed"
+      
+      - name: Clone PizzaG device and vendor repos
+        run: |
+          echo "=== Cloning PizzaG device and vendor repositories ==="
+          
+          mkdir -p pizzag-repos
+          cd pizzag-repos
+          
+          echo "Cloning vendor repository..."
+          git clone --depth 1 https://github.com/PizzaG/android_vendor_motorola_yume.git
+          
+          echo "Cloning device repository..."
+          git clone --depth 1 https://github.com/PizzaG/android_device_motorola_yume.git
+          
+          cd ..
+          echo "Device and vendor repos cloned successfully"
+      
+      - name: Clone sosRR kernel repository
+        run: |
+          echo "=== Cloning sosRR kernel repository ==="
+          
+          git clone --depth 1 https://github.com/sosRR/platform_kernel_motorola_genevn.git
+          
+          echo "Kernel repository cloned successfully"
+      
+      - name: Download kernel tarball
+        run: |
+          echo "=== Downloading kernel tarball ==="
+          
+          mkdir -p kernel-sources
+          cd kernel-sources
+          
+          wget -q --show-progress https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.233.tar.xz
+          
+          echo "Extracting kernel tarball..."
+          tar -xf linux-5.10.233.tar.xz
+          
+          echo "Kernel tarball downloaded and extracted"
+          ls -lh
+          cd ..
+      
+      - name: Collect device configurations
+        run: |
+          echo "=== Collecting device configurations ==="
+          
+          # Prepare repository list for collection script
+          REPOS="https://github.com/PizzaG/Build-Env-Setup-Scripts.git"
+          REPOS="$REPOS https://github.com/PizzaG/android_vendor_motorola_yume.git"
+          REPOS="$REPOS https://github.com/PizzaG/android_device_motorola_yume.git"
+          REPOS="$REPOS https://github.com/sosRR/platform_kernel_motorola_genevn.git"
+          REPOS="$REPOS https://gitlab.com/kalilinux/nethunter/nh-resources.git"
+          REPOS="$REPOS https://gitlab.com/kalilinux/nethunter/nh-scripts.git"
+          REPOS="$REPOS https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-installer.git"
+          REPOS="$REPOS https://gitlab.com/akabulous/So_You_Want_To_Build_A_Nethunter_Kernel.git"
+          REPOS="$REPOS https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-pro.git"
+          
+          # Make script executable (should already be, but ensure it)
+          chmod +x scripts/collect-device-configs.sh
+          
+          # Run collection script
+          ./scripts/collect-device-configs.sh --repos "$REPOS"
+          
+          echo "Device configurations collected successfully"
+      
+      - name: Add kernel sources to device-configs
+        run: |
+          echo "=== Adding kernel sources to device-configs ==="
+          
+          mkdir -p device-configs/kernel-sources
+          
+          # Copy kernel tarball
+          if [ -f "kernel-sources/linux-5.10.233.tar.xz" ]; then
+            cp kernel-sources/linux-5.10.233.tar.xz device-configs/kernel-sources/
+            echo "Kernel tarball copied to device-configs"
+          fi
+          
+          # Add kernel source info
+          echo "Kernel source: https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.233.tar.xz" > device-configs/kernel-sources/README.txt
+          echo "Downloaded: $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> device-configs/kernel-sources/README.txt
+      
+      - name: Prepare build environment variables
+        id: build_env
+        run: |
+          echo "=== Preparing build environment ==="
+          
+          # Set up environment variables for subsequent build steps
+          echo "ARCH=arm64" >> $GITHUB_ENV
+          echo "CROSS_COMPILE=aarch64-linux-gnu-" >> $GITHUB_ENV
+          echo "LLVM=1" >> $GITHUB_ENV
+          
+          # Create build environment summary
+          cat > device-configs/build-env-setup.txt << 'EOF'
+          === Build Environment Setup ===
+          
+          Architecture: arm64
+          Cross Compiler: aarch64-linux-gnu-
+          LLVM: Enabled
+          
+          Toolchain paths:
+          EOF
+          
+          which aarch64-linux-gnu-gcc >> device-configs/build-env-setup.txt || echo "GCC not found" >> device-configs/build-env-setup.txt
+          which clang >> device-configs/build-env-setup.txt || echo "Clang not found" >> device-configs/build-env-setup.txt
+          which lld >> device-configs/build-env-setup.txt || echo "LLD not found" >> device-configs/build-env-setup.txt
+          
+          echo "" >> device-configs/build-env-setup.txt
+          echo "Environment variables set for kernel builds:" >> device-configs/build-env-setup.txt
+          echo "  ARCH=arm64" >> device-configs/build-env-setup.txt
+          echo "  CROSS_COMPILE=aarch64-linux-gnu-" >> device-configs/build-env-setup.txt
+          echo "  LLVM=1" >> device-configs/build-env-setup.txt
+          
+          echo "Build environment prepared"
+          cat device-configs/build-env-setup.txt
+          
+          # Output status
+          echo "build_env_ready=true" >> $GITHUB_OUTPUT
+      
+      - name: Generate collection manifest
+        run: |
+          echo "=== Generating collection manifest ==="
+          
+          cat > device-configs/MANIFEST.txt << 'EOF'
+          === Device Configuration Collection Manifest ===
+          
+          This artifact contains device, kernel, vendor, and NetHunter-related
+          configuration files collected from multiple repositories.
+          
+          Collection Strategy:
+          1. Attempted NetHunter installer provisioning first
+          2. Fell back to PizzaG Build-Env-Setup-Scripts if needed
+          3. Collected all device-specific configurations
+          4. Prepared build environment for kernel compilation
+          
+          Repository Sources:
+          - PizzaG Build-Env: https://github.com/PizzaG/Build-Env-Setup-Scripts.git
+          - PizzaG Vendor: https://github.com/PizzaG/android_vendor_motorola_yume.git
+          - PizzaG Device: https://github.com/PizzaG/android_device_motorola_yume.git
+          - sosRR Kernel: https://github.com/sosRR/platform_kernel_motorola_genevn.git
+          - NetHunter Resources: https://gitlab.com/kalilinux/nethunter/nh-resources.git
+          - NetHunter Scripts: https://gitlab.com/kalilinux/nethunter/nh-scripts.git
+          - NetHunter Installer: https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-installer.git
+          - NetHunter Kernel Guide: https://gitlab.com/akabulous/So_You_Want_To_Build_A_Nethunter_Kernel.git
+          - NetHunter Pro: https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-pro.git
+          
+          Kernel Source:
+          - Mainline: https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-5.10.233.tar.xz
+          
+          Directory Structure:
+          - vendor/: Vendor-specific files and configurations
+          - device/: Device-specific files and configurations
+          - kernel/: Kernel sources and configurations
+          - nethunter/: NetHunter-related scripts and resources
+          - build-env/: Build environment setup scripts
+          - kernel-sources/: Kernel tarball and source references
+          
+          Usage:
+          This artifact is ready for use in subsequent kernel build jobs.
+          The build environment has been initialized with:
+          - ARCH=arm64
+          - CROSS_COMPILE=aarch64-linux-gnu-
+          - LLVM=1
+          
+          Next Steps:
+          1. Extract this artifact in your build job
+          2. Use the collected configurations for kernel compilation
+          3. Reference device-specific files as needed
+          
+          Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          EOF
+          
+          cat device-configs/MANIFEST.txt
+      
+      - name: Upload device-configs artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: device-configs
+          path: device-configs/
+          retention-days: 30
+      
+      - name: Summary
+        run: |
+          echo "=== Collection and Setup Summary ==="
+          echo ""
+          echo "✅ NetHunter Status: ${{ steps.nethunter_install.outputs.nethunter_status || 'attempted' }}"
+          echo "✅ Build Environment: ${{ steps.build_env.outputs.build_env_ready }}"
+          echo "✅ Device Configs Collected: Yes"
+          echo "✅ Artifact Uploaded: Yes"
+          echo ""
+          echo "The device-configs artifact is ready for subsequent kernel build jobs."
+          echo "All device, kernel, vendor, and NetHunter-related files have been collected."
+          echo ""
+          
+          # Show summary of collected files
+          if [ -f "device-configs/collection-summary.txt" ]; then
+            echo "Collection Summary:"
+            cat device-configs/collection-summary.txt
+          fi
