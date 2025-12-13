@@ -133,7 +133,7 @@ if [[ -n "$TOOLCHAIN_URL" && -n "$LOCAL_ARCHIVE" ]]; then
 fi
 
 # Check if toolchain already exists
-if [[ -d "$TOOLCHAIN_DIR" && "$(ls -A "$TOOLCHAIN_DIR" 2>/dev/null)" ]]; then
+if [[ -d "$TOOLCHAIN_DIR" && -n "$(find "$TOOLCHAIN_DIR" -mindepth 1 -print -quit 2>/dev/null)" ]]; then
     if [[ "$FORCE" != "true" ]]; then
         log_info "Toolchain already exists at: $TOOLCHAIN_DIR"
         log_info "Use --force to re-extract"
@@ -239,12 +239,16 @@ elif [[ "$ARCHIVE_LOWER" == *.zip ]]; then
             exit 1
         }
         # Move contents (strip top level if single directory)
-        EXTRACTED_ITEMS=($(ls -A "$TEMP_EXTRACT"))
-        if [[ ${#EXTRACTED_ITEMS[@]} -eq 1 && -d "$TEMP_EXTRACT/${EXTRACTED_ITEMS[0]}" ]]; then
-            mv "$TEMP_EXTRACT/${EXTRACTED_ITEMS[0]}"/* "$TOOLCHAIN_DIR/"
+        shopt -s dotglob nullglob
+        EXTRACTED_ITEMS=("$TEMP_EXTRACT"/*)
+        if [[ ${#EXTRACTED_ITEMS[@]} -eq 1 && -d "${EXTRACTED_ITEMS[0]}" ]]; then
+            mv "${EXTRACTED_ITEMS[0]}"/* "$TOOLCHAIN_DIR/" 2>/dev/null || true
+            mv "${EXTRACTED_ITEMS[0]}"/.[!.]* "$TOOLCHAIN_DIR/" 2>/dev/null || true
         else
-            mv "$TEMP_EXTRACT"/* "$TOOLCHAIN_DIR/"
+            mv "$TEMP_EXTRACT"/* "$TOOLCHAIN_DIR/" 2>/dev/null || true
+            mv "$TEMP_EXTRACT"/.[!.]* "$TOOLCHAIN_DIR/" 2>/dev/null || true
         fi
+        shopt -u dotglob nullglob
         rm -rf "$TEMP_EXTRACT"
     else
         log_error "unzip command not found. Please install unzip to extract .zip archives."
@@ -259,14 +263,14 @@ fi
 log_info "Toolchain extracted successfully"
 
 # Verify extraction
-if [[ ! -d "$TOOLCHAIN_DIR" || -z "$(ls -A "$TOOLCHAIN_DIR" 2>/dev/null)" ]]; then
+if [[ ! -d "$TOOLCHAIN_DIR" || -z "$(find "$TOOLCHAIN_DIR" -mindepth 1 -print -quit 2>/dev/null)" ]]; then
     log_error "Toolchain directory is empty after extraction"
     exit 1
 fi
 
 # Show toolchain contents summary
 log_info "Toolchain contents:"
-ls -lh "$TOOLCHAIN_DIR" | head -10
+find "$TOOLCHAIN_DIR" -maxdepth 1 -ls 2>/dev/null | head -10
 
 # Find compiler binaries
 COMPILERS=$(find "$TOOLCHAIN_DIR" -type f -name "*-gcc" -o -name "*-g++" -o -name "clang*" 2>/dev/null | head -5)
