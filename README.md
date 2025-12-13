@@ -8,41 +8,37 @@ This repository contains build scripts, kernel sources, and toolchain setup for 
 
 ## Quick Start
 
-### 1. Setup Toolchain
+### 1. Source Device Configuration
 
-First, set up the required cross-compiler toolchain:
+First, source the device configuration file:
 
 ```bash
-# Download and extract toolchain from URL
-./scripts/config.genevn --url <TOOLCHAIN_URL>
+# Source device config
+source ./scripts/config.genevn
 
-# Or use a local archive
-./scripts/config.genevn --local-archive /path/to/toolchain.tar.gz
-
-# With checksum verification (recommended)
-./scripts/config.genevn \
-  --url <TOOLCHAIN_URL> \
-  --checksum <SHA256_HASH>
+# Verify configuration
+echo "Building for: $DEVICE_FULL_NAME"
+echo "Architecture: $ARCH (64-bit)"
 ```
 
-See [scripts/README.md](scripts/README.md) for detailed toolchain setup instructions.
-
-### 2. Configure Build Environment
+### 2. Clone Kernel Source
 
 ```bash
-# Add toolchain to PATH
-export PATH="${PWD}/toolchains/motorola/bin:${PATH}"
-
-# Set architecture and cross-compiler
-export ARCH=arm64
-export CROSS_COMPILE=aarch64-linux-android-
+# Clone Motorola kernel source
+git clone --depth 1 --branch MMI-T1TGNS33.60-41-2-7 \
+  https://github.com/MotorolaMobilityLLC/kernel-msm.git kernel
 ```
 
 ### 3. Build Kernel/Modules
 
 ```bash
-cd upstream-kernel
-make -j$(nproc) O=out Image.gz dtbs modules
+# Setup toolchain (add to PATH)
+export PATH="${PWD}/toolchains/motorola/bin:${PATH}"
+
+# Build kernel
+cd kernel
+make O=$OUT_DIR $DEFCONFIG
+make -j$(nproc) O=$OUT_DIR Image.gz dtbs modules
 ```
 
 ## Repository Structure
@@ -51,7 +47,7 @@ make -j$(nproc) O=out Image.gz dtbs modules
 .
 ├── device-kernel/           # Device-specific kernel binaries
 ├── scripts/                 # Build and setup scripts
-│   ├── config.genevn   # Toolchain download and setup
+│   ├── config.genevn        # Device configuration for NetHunter builds
 │   └── README.md            # Detailed script documentation
 ├── toolchains/              # Extracted toolchains (gitignored)
 └── .github/workflows/       # CI/CD workflows

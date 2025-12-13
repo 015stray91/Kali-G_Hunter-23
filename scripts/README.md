@@ -6,72 +6,75 @@ This directory contains helper scripts for setting up the build environment and 
 
 ### config.genevn
 
-Downloads, verifies, and extracts the Motorola device toolchain required for building kernel modules.
+NetHunter kernel builder configuration file for the Motorola G Stylus 5G (2023) device.
 
 #### Usage
 
+Source this configuration file to set up your build environment:
+
 ```bash
-# Download from URL
-./scripts/config.genevn --url https://example.com/toolchain.tar.gz
+# Source the config file
+source ./scripts/config.genevn
 
-# Use local archive
-./scripts/config.genevn --local-archive /path/to/toolchain.tar.gz
-
-# With checksum verification
-./scripts/config.genevn --url https://example.com/toolchain.tar.gz \
-  --checksum abc123def456...
-
-# Force re-extraction
-./scripts/config.genevn --local-archive toolchain.tar.gz --force
+# Verify configuration
+echo "Building for: $DEVICE_FULL_NAME ($DEVICE_MODEL)"
+echo "Architecture: $ARCH"
+echo "Cross Compiler: $CROSS_COMPILE"
 ```
 
-#### Options
+#### Configuration Variables
 
-- `--url URL` - URL to download the toolchain archive from
-- `--local-archive PATH` - Path to a local toolchain archive file
-- `--checksum HASH` - Optional SHA256 checksum to verify the archive integrity
-- `--force` - Force re-extraction even if toolchain already exists
-- `--help` - Show help message
+The config file exports the following environment variables:
 
-#### Environment Variables
+**Device Information:**
+- `DEVICE_NAME="genevn"` - Device codename
+- `DEVICE_CODENAME="G_Hunter"` - Alternative codename
+- `DEVICE_FULL_NAME="Motorola G Stylus 5G (2023)"` - Full device name
+- `DEVICE_MODEL="XT-2315"` - Device model number
 
-- `TOOLCHAIN_URL` - Default URL if `--url` is not provided
-- `TOOLCHAIN_CHECKSUM` - Default checksum if `--checksum` is not provided
+**Architecture (64-bit):**
+- `ARCH=arm64` - Target architecture
+- `SUBARCH=arm64` - Sub-architecture
+
+**Build Configuration:**
+- `DEFCONFIG=genevn_defconfig` - Kernel defconfig name
+- `CROSS_COMPILE=aarch64-linux-android-` - 64-bit cross-compiler prefix
+- `CROSS_COMPILE_ARM32=arm-linux-androideabi-` - 32-bit cross-compiler prefix (for compatibility)
+- `KERNEL_DIR="$PWD/kernel"` - Kernel source directory
+- `OUT_DIR="$PWD/out"` - Build output directory
+- `ENABLE_NETHUNTER=1` - NetHunter support flag
 
 #### Examples
 
-**Using environment variables:**
+**Basic kernel build:**
 
 ```bash
-export TOOLCHAIN_URL="https://example.com/motorola-toolchain.tar.gz"
-export TOOLCHAIN_CHECKSUM="abc123def456..."
-./scripts/config.genevn
+# Source configuration
+source ./scripts/config.genevn
+
+# Clone kernel source
+git clone --depth 1 --branch MMI-T1TGNS33.60-41-2-7 \
+  https://github.com/MotorolaMobilityLLC/kernel-msm.git kernel
+
+# Build kernel
+cd kernel
+make O=$OUT_DIR $DEFCONFIG
+make -j$(nproc) O=$OUT_DIR Image.gz dtbs modules
 ```
 
-**Download and extract in one command:**
+**Using with existing toolchain:**
 
 ```bash
-./scripts/config.genevn \
-  --url https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.0.0_r1.tar.gz
-```
+# Add toolchain to PATH
+export PATH="${PWD}/toolchains/motorola/bin:${PATH}"
 
-**Using a local archive:**
+# Source device configuration
+source ./scripts/config.genevn
 
-```bash
-# If you've already downloaded the toolchain manually
-./scripts/config.genevn --local-archive ~/Downloads/toolchain.tar.gz
-```
-
-#### Output
-
-The toolchain will be extracted to:
-```
-toolchains/motorola/
-```
-
-Downloaded archives are cached in:
-```
-.toolchain-downloads/
+# Build
+cd kernel
+make O=$OUT_DIR $DEFCONFIG
+make -j$(nproc) O=$OUT_DIR
 ```
 
 ## Motorola G Stylus 5G (2023) Toolchain
