@@ -6,76 +6,55 @@ This directory contains helper scripts for setting up the build environment and 
 
 ### config.genevn
 
-NetHunter kernel builder configuration file for the Motorola G Stylus 5G (2023) device.
+NetHunter kernel builder device configuration file in TOML format for the Motorola G Stylus 5G (2023).
+
+#### Format
+
+This is a TOML configuration file that defines:
+- **Chipset**: SM6450 (Snapdragon 6 Gen 1)
+- **Boot image parameters**: Load addresses and block device sector size
+- **Device parameters**: Vendor, model, and device-specific settings
+
+#### Configuration Structure
+
+```toml
+# Chipset for device-tree file naming
+chipset = "sm6450"
+
+# Boot image parameters
+[bootimg]
+base = 0x0
+kernel = 0x8000
+ramdisk = 0x1000000
+second = 0x0
+tags = 0x100
+pagesize = 4096
+
+# Device entry
+[[device]]
+vendor = "motorola"
+model = "genevn"
+```
 
 #### Usage
 
-Source this configuration file to set up your build environment:
+This configuration file is used by NetHunter kernel builder tools to:
+1. Identify the correct device-tree file
+2. Construct the boot image with proper load addresses
+3. Build kernel for the specific device
 
-```bash
-# Source the config file
-source ./scripts/config.genevn
+#### Device Information
 
-# Verify configuration
-echo "Building for: $DEVICE_FULL_NAME ($DEVICE_MODEL)"
-echo "Architecture: $ARCH"
-echo "Cross Compiler: $CROSS_COMPILE"
-```
+- **Device**: Motorola G Stylus 5G (2023)
+- **Model**: XT-2315
+- **Codename**: genevn / G_Hunter
+- **Chipset**: Qualcomm SM6450 (Snapdragon 6 Gen 1)
+- **Architecture**: ARM64 (64-bit)
+- **Kernel Source**: MMI-T1TGNS33.60-41-2-7 branch
 
-#### Configuration Variables
+#### Boot Image Parameters
 
-The config file exports the following environment variables:
-
-**Device Information:**
-- `DEVICE_NAME="genevn"` - Device codename
-- `DEVICE_CODENAME="G_Hunter"` - Alternative codename
-- `DEVICE_FULL_NAME="Motorola G Stylus 5G (2023)"` - Full device name
-- `DEVICE_MODEL="XT-2315"` - Device model number
-
-**Architecture (64-bit):**
-- `ARCH=arm64` - Target architecture
-- `SUBARCH=arm64` - Sub-architecture
-
-**Build Configuration:**
-- `DEFCONFIG=genevn_defconfig` - Kernel defconfig name
-- `CROSS_COMPILE=aarch64-linux-android-` - 64-bit cross-compiler prefix
-- `CROSS_COMPILE_ARM32=arm-linux-androideabi-` - 32-bit cross-compiler prefix (for compatibility)
-- `KERNEL_DIR="$PWD/kernel"` - Kernel source directory
-- `OUT_DIR="$PWD/out"` - Build output directory
-- `ENABLE_NETHUNTER=1` - NetHunter support flag
-
-#### Examples
-
-**Basic kernel build:**
-
-```bash
-# Source configuration
-source ./scripts/config.genevn
-
-# Clone kernel source
-git clone --depth 1 --branch MMI-T1TGNS33.60-41-2-7 \
-  https://github.com/MotorolaMobilityLLC/kernel-msm.git kernel
-
-# Build kernel
-cd kernel
-make O=$OUT_DIR $DEFCONFIG
-make -j$(nproc) O=$OUT_DIR Image.gz dtbs modules
-```
-
-**Using with existing toolchain:**
-
-```bash
-# Add toolchain to PATH
-export PATH="${PWD}/toolchains/motorola/bin:${PATH}"
-
-# Source device configuration
-source ./scripts/config.genevn
-
-# Build
-cd kernel
-make O=$OUT_DIR $DEFCONFIG
-make -j$(nproc) O=$OUT_DIR
-```
+The boot image parameters can be extracted from an existing boot image using `abootimg -i <image>` or similar tools. These values are specific to the Motorola G Stylus 5G (2023) device.
 
 ## Motorola G Stylus 5G (2023) Toolchain
 

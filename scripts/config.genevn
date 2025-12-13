@@ -1,36 +1,19 @@
-#!/bin/bash
+# Motorola G Stylus 5G (2023) - XT-2315
+# Codename: genevn / G_Hunter
+# Chipset: SM6450 (Snapdragon 6 Gen 1)
+# Architecture: ARM64 (64-bit)
+# Kernel Source: MMI-T1TGNS33.60-41-2-7
 
-############################################################################################
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-# Kernel Source:
-# git clone --depth 1 --branch MMI-T1TGNS33.60-41-2-7 https://github.com/MotorolaMobilityLLC/kernel-msm.git kernel
-# ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-############################################################################################
+chipset = "sm6450"
 
-##############################################
-# Device Configuration
-##############################################
+[bootimg]
+base = 0x0
+kernel = 0x8000
+ramdisk = 0x1000000
+second = 0
+tags = 0x100
+pagesize = 4096
 
-# Device info
-export DEVICE_NAME="genevn"
-export DEVICE_CODENAME="G_Hunter"
-export DEVICE_FULL_NAME="Motorola G Stylus 5G (2023)"
-export DEVICE_MODEL="XT-2315"
-
-# Architecture (64-bit)
-export ARCH=arm64
-export SUBARCH=arm64
-
-# Defconfig
-export DEFCONFIG=genevn_defconfig
-
-# Compiler/Toolchain
-export CROSS_COMPILE=aarch64-linux-android-
-export CROSS_COMPILE_ARM32=arm-linux-androideabi-
-
-# Kernel build configuration
-export KERNEL_DIR="$PWD/kernel"
-export OUT_DIR="$PWD/out"
-
-# NetHunter specific
-export ENABLE_NETHUNTER=1
+[[device]]
+vendor = "motorola"
+model = "genevn"

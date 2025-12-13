@@ -8,20 +8,7 @@ This repository contains build scripts, kernel sources, and toolchain setup for 
 
 ## Quick Start
 
-### 1. Source Device Configuration
-
-First, source the device configuration file:
-
-```bash
-# Source device config
-source ./scripts/config.genevn
-
-# Verify configuration
-echo "Building for: $DEVICE_FULL_NAME"
-echo "Architecture: $ARCH (64-bit)"
-```
-
-### 2. Clone Kernel Source
+### 1. Clone Kernel Source
 
 ```bash
 # Clone Motorola kernel source
@@ -29,17 +16,21 @@ git clone --depth 1 --branch MMI-T1TGNS33.60-41-2-7 \
   https://github.com/MotorolaMobilityLLC/kernel-msm.git kernel
 ```
 
-### 3. Build Kernel/Modules
+### 2. Build Kernel/Modules
 
 ```bash
 # Setup toolchain (add to PATH)
 export PATH="${PWD}/toolchains/motorola/bin:${PATH}"
+export ARCH=arm64
+export CROSS_COMPILE=aarch64-linux-android-
 
 # Build kernel
 cd kernel
-make O=$OUT_DIR $DEFCONFIG
-make -j$(nproc) O=$OUT_DIR Image.gz dtbs modules
+make O=out genevn_defconfig
+make -j$(nproc) O=out Image.gz dtbs modules
 ```
+
+See [scripts/README.md](scripts/README.md) for device configuration details.
 
 ## Repository Structure
 
