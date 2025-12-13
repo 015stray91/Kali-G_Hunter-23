@@ -14,13 +14,13 @@ First, set up the required cross-compiler toolchain:
 
 ```bash
 # Download and extract toolchain from URL
-./scripts/setup-toolchain.sh --url <TOOLCHAIN_URL>
+./scripts/config.genevn --url <TOOLCHAIN_URL>
 
 # Or use a local archive
-./scripts/setup-toolchain.sh --local-archive /path/to/toolchain.tar.gz
+./scripts/config.genevn --local-archive /path/to/toolchain.tar.gz
 
 # With checksum verification (recommended)
-./scripts/setup-toolchain.sh \
+./scripts/config.genevn \
   --url <TOOLCHAIN_URL> \
   --checksum <SHA256_HASH>
 ```
@@ -51,7 +51,7 @@ make -j$(nproc) O=out Image.gz dtbs modules
 .
 ├── device-kernel/           # Device-specific kernel binaries
 ├── scripts/                 # Build and setup scripts
-│   ├── setup-toolchain.sh   # Toolchain download and setup
+│   ├── config.genevn   # Toolchain download and setup
 │   └── README.md            # Detailed script documentation
 ├── toolchains/              # Extracted toolchains (gitignored)
 └── .github/workflows/       # CI/CD workflows

@@ -4,7 +4,7 @@ This directory contains helper scripts for setting up the build environment and 
 
 ## Scripts
 
-### setup-toolchain.sh
+### config.genevn
 
 Downloads, verifies, and extracts the Motorola device toolchain required for building kernel modules.
 
@@ -12,17 +12,17 @@ Downloads, verifies, and extracts the Motorola device toolchain required for bui
 
 ```bash
 # Download from URL
-./scripts/setup-toolchain.sh --url https://example.com/toolchain.tar.gz
+./scripts/config.genevn --url https://example.com/toolchain.tar.gz
 
 # Use local archive
-./scripts/setup-toolchain.sh --local-archive /path/to/toolchain.tar.gz
+./scripts/config.genevn --local-archive /path/to/toolchain.tar.gz
 
 # With checksum verification
-./scripts/setup-toolchain.sh --url https://example.com/toolchain.tar.gz \
+./scripts/config.genevn --url https://example.com/toolchain.tar.gz \
   --checksum abc123def456...
 
 # Force re-extraction
-./scripts/setup-toolchain.sh --local-archive toolchain.tar.gz --force
+./scripts/config.genevn --local-archive toolchain.tar.gz --force
 ```
 
 #### Options
@@ -45,13 +45,13 @@ Downloads, verifies, and extracts the Motorola device toolchain required for bui
 ```bash
 export TOOLCHAIN_URL="https://example.com/motorola-toolchain.tar.gz"
 export TOOLCHAIN_CHECKSUM="abc123def456..."
-./scripts/setup-toolchain.sh
+./scripts/config.genevn
 ```
 
 **Download and extract in one command:**
 
 ```bash
-./scripts/setup-toolchain.sh \
+./scripts/config.genevn \
   --url https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9/+archive/refs/tags/android-12.0.0_r1.tar.gz
 ```
 
@@ -59,7 +59,7 @@ export TOOLCHAIN_CHECKSUM="abc123def456..."
 
 ```bash
 # If you've already downloaded the toolchain manually
-./scripts/setup-toolchain.sh --local-archive ~/Downloads/toolchain.tar.gz
+./scripts/config.genevn --local-archive ~/Downloads/toolchain.tar.gz
 ```
 
 #### Output
@@ -94,7 +94,7 @@ For the Motorola G Stylus 5G (2023) device (codename: genevn/G_Hunter), you need
 
 ### Setting up the Toolchain for Building
 
-After running `setup-toolchain.sh`, configure your environment:
+After running `config.genevn`, configure your environment:
 
 ```bash
 # Add toolchain to PATH
@@ -126,12 +126,12 @@ make -j$(nproc) O=out Image.gz dtbs modules
 
 ## CI/CD Integration
 
-The `setup-toolchain.sh` script can be integrated into CI workflows:
+The `config.genevn` script can be integrated into CI workflows:
 
 ```yaml
 - name: Setup Motorola Toolchain
   run: |
-    ./scripts/setup-toolchain.sh \
+    ./scripts/config.genevn \
       --url "${{ secrets.TOOLCHAIN_URL }}" \
       --checksum "${{ secrets.TOOLCHAIN_CHECKSUM }}"
   
@@ -163,7 +163,7 @@ sudo apt-get install -y \
 
 ```bash
 # 1. Setup toolchain
-./scripts/setup-toolchain.sh --url <TOOLCHAIN_URL>
+./scripts/config.genevn --url <TOOLCHAIN_URL>
 
 # 2. Configure environment
 export PATH="${PWD}/toolchains/motorola/bin:${PATH}"
@@ -195,7 +195,7 @@ Different kernel versions may require specific compiler versions. Ensure you're 
 If you get permission errors during extraction:
 
 ```bash
-chmod +x scripts/setup-toolchain.sh
+chmod +x scripts/config.genevn
 ```
 
 ### Download Failures
