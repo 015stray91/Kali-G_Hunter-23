@@ -1,0 +1,9 @@
+# Work directory for collecting configs
+work/
+
+# Collected configs output (should be uploaded as artifacts, not committed)
+device-configs-collected/
+
+# Temporary files
+*.tmp
+*.log
