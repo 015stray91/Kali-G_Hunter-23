@@ -1,22 +1,31 @@
-#!/bin/bash
+#!/usr/bin/env bash
+set -euo pipefail
+
 #
 # collect-device-configs.sh
-# 
-# Script to provision toolchains and collect device/kernel/NetHunter configuration files
-# into an artifact directory for CI purposes.
 #
-# Usage: ./collect-device-configs.sh --repos "repo1,repo2,repo3"
+# Collects device and kernel configurations from multiple repositories,
+# provisions Android kernel toolchain via PizzaG's Build-Env-Setup-Scripts,
+# includes NetHunter resources, and downloads the specified kernel tarball.
 #
-
-set -e
+# Usage:
+#   ./scripts/collect-device-configs.sh --repos "repo1,repo2,..." --kernel-url "https://..." --output-dir "path/to/output"
+#
 
 # Default values
+OUTPUT_DIR="device-configs-collected"
+KERNEL_URL=""
 REPOS=""
-OUTPUT_DIR="device-configs-artifact"
-NETHUNTER_INSTALLER_REPOS=(
-    "https://gitlab.com/kalilinux/nethunter/build-scripts/kali-nethunter-devices.git"
-)
-PIZZAG_TOOLCHAIN_REPO="https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9"
+WORK_DIR="$(pwd)/work"
+
+# Device metadata for Motorola Moto G Stylus 5G (2020)
+DEVICE_BRAND="Motorola"
+DEVICE_MODEL="Moto G Stylus 5G (2020)"
+DEVICE_CODENAME="genevn"
+DEVICE_SOC="SM6450"
+KERNEL_VERSION="5.10.233"
+CLANG_VERSION="12.0.5"
+LLD_VERSION="12.0.5"
 
 # Parse command line arguments
 while [[ $# -gt 0 ]]; do
@@ -36,244 +45,31 @@ while [[ $# -gt 0 ]]; do
             echo "  --repos REPOS    Comma-separated list of additional repositories to check"
             echo "  --output DIR     Output directory for collected configs (default: device-configs-artifact)"
             echo "  -h, --help       Show this help message"
+        --kernel-url)
+            KERNEL_URL="$2"
+            shift 2
+            ;;
+        --output-dir)
+            OUTPUT_DIR="$2"
+            shift 2
+            ;;
+        --help)
+            echo "Usage: $0 --repos <repo1,repo2,...> --kernel-url <url> [--output-dir <dir>]"
+            echo ""
+            echo "Options:"
+            echo "  --repos         Comma-separated list of repository URLs to clone"
+            echo "  --kernel-url    URL to kernel tarball (e.g., https://cdn.kernel.org/...)"
+            echo "  --output-dir    Output directory for collected configs (default: device-configs-collected)"
             exit 0
             ;;
         *)
             echo "Unknown option: $1"
-            echo "Use -h or --help for usage information"
+            echo "Use --help for usage information"
             exit 1
             ;;
     esac
 done
 
-# Create output directory structure
-mkdir -p "${OUTPUT_DIR}/device"
-mkdir -p "${OUTPUT_DIR}/kernel"
-mkdir -p "${OUTPUT_DIR}/nethunter"
-mkdir -p "${OUTPUT_DIR}/toolchain"
-
-echo "=== Device Configuration Collection Script ==="
-echo "Output directory: ${OUTPUT_DIR}"
-echo ""
-
-# Function to copy config files safely
-copy_config_files() {
-    local source_dir="$1"
-    local dest_dir="$2"
-    
-    find "${source_dir}" -type f \( -name "*.config" -o -name "*defconfig" \) 2>/dev/null | while read -r config_file; do
-        if cp "${config_file}" "${dest_dir}/" 2>/dev/null; then
-            echo "✓ Copied $(basename "${config_file}")"
-        else
-            echo "⚠ Warning: Failed to copy $(basename "${config_file}")" >&2
-        fi
-    done
-    return 0
-}
-
-# Function to try cloning a repository
-try_clone_repo() {
-    local repo_url="$1"
-    local dest_dir="$2"
-    local depth="${3:-1}"
-    local timeout="${4:-30}"
-    
-    echo "Attempting to clone: ${repo_url}"
-    
-    # Disable interactive prompts to prevent credential requests
-    export GIT_TERMINAL_PROMPT=0
-    
-    if timeout "${timeout}" git clone --depth "${depth}" "${repo_url}" "${dest_dir}" 2>&1; then
-        if [ -d "${dest_dir}/.git" ]; then
-            echo "✓ Successfully cloned ${repo_url}"
-            unset GIT_TERMINAL_PROMPT
-            return 0
-        fi
-    fi
-    echo "✗ Failed to clone ${repo_url}"
-    unset GIT_TERMINAL_PROMPT
-    return 1
-}
-
-# Function to collect device configuration from NetHunter devices repo
-collect_nethunter_configs() {
-    echo ""
-    echo "=== Attempting to collect NetHunter device configurations ==="
-    
-    for repo in "${NETHUNTER_INSTALLER_REPOS[@]}"; do
-        local temp_dir=$(mktemp -d)
-        if try_clone_repo "${repo}" "${temp_dir}"; then
-            # Look for device configurations
-            if [ -d "${temp_dir}/devices" ]; then
-                echo "Found devices directory, copying configurations..."
-                if cp -r "${temp_dir}/devices"/* "${OUTPUT_DIR}/nethunter/" 2>/dev/null; then
-                    echo "✓ Copied device configurations"
-                else
-                    echo "⚠ Warning: Some device configs failed to copy" >&2
-                fi
-            fi
-            
-            # Look for kernel configurations
-            if [ -d "${temp_dir}/kernel-configs" ]; then
-                echo "Found kernel-configs directory, copying..."
-                if cp -r "${temp_dir}/kernel-configs"/* "${OUTPUT_DIR}/kernel/" 2>/dev/null; then
-                    echo "✓ Copied kernel configurations"
-                else
-                    echo "⚠ Warning: Some kernel configs failed to copy" >&2
-                fi
-            fi
-            
-            # Copy any .config or defconfig files
-            copy_config_files "${temp_dir}" "${OUTPUT_DIR}/kernel"
-            
-            rm -rf "${temp_dir}"
-            echo "✓ NetHunter configurations collected"
-            return 0
-        fi
-        rm -rf "${temp_dir}"
-    done
-    
-    echo "✗ Could not collect NetHunter configurations"
-    return 1
-}
-
-# Function to provision PizzaG toolchain as fallback
-provision_pizzag_toolchain() {
-    echo ""
-    echo "=== Provisioning fallback toolchain ==="
-    
-    # Create toolchain info even if we can't clone
-    cat > "${OUTPUT_DIR}/toolchain/toolchain-info.txt" <<EOF
-Toolchain Fallback Configuration
-Repository attempted: ${PIZZAG_TOOLCHAIN_REPO}
-Collected at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-Status: Attempting to provision...
-EOF
-    
-    local temp_dir=$(mktemp -d)
-    if try_clone_repo "${PIZZAG_TOOLCHAIN_REPO}" "${temp_dir}"; then
-        echo "Toolchain cloned successfully"
-        
-        # Copy toolchain info
-        if [ -f "${temp_dir}/README.md" ]; then
-            cp "${temp_dir}/README.md" "${OUTPUT_DIR}/toolchain/toolchain-README.md"
-        fi
-        
-        # Update toolchain info file
-        cat > "${OUTPUT_DIR}/toolchain/toolchain-info.txt" <<EOF
-Toolchain Configuration
-Repository: ${PIZZAG_TOOLCHAIN_REPO}
-Clone path: ${temp_dir}
-Status: Successfully provisioned
-Collected at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-EOF
-        
-        rm -rf "${temp_dir}"
-        echo "✓ Toolchain information collected"
-        return 0
-    else
-        rm -rf "${temp_dir}"
-        
-        # Update status to indicate failure but continue
-        cat > "${OUTPUT_DIR}/toolchain/toolchain-info.txt" <<EOF
-Toolchain Configuration
-Repository attempted: ${PIZZAG_TOOLCHAIN_REPO}
-Status: Failed to clone (network/auth issue)
-Note: This is optional for config collection
-Collected at: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-
-Alternative: Use system toolchain or manual provisioning
-EOF
-        echo "✗ Failed to provision toolchain (continuing anyway)"
-        return 1
-    fi
-}
-
-# Function to collect device-specific files from current repository
-collect_local_device_files() {
-    echo ""
-    echo "=== Collecting local device/kernel files ==="
-    
-    # Collect device kernel if present
-    if [ -d "device-kernel" ]; then
-        echo "Found device-kernel directory"
-        
-        # Copy kernel binary
-        if [ -f "device-kernel/kernel" ]; then
-            if cp "device-kernel/kernel" "${OUTPUT_DIR}/device/kernel-image" 2>/dev/null; then
-                echo "✓ Copied kernel image"
-            else
-                echo "⚠ Warning: Failed to copy kernel image" >&2
-            fi
-        fi
-        
-        # Look for any config files
-        copy_config_files "device-kernel" "${OUTPUT_DIR}/device"
-    fi
-    
-    # Collect any device tree files
-    if [ -d "device-tree" ]; then
-        if cp -r device-tree/* "${OUTPUT_DIR}/device/" 2>/dev/null; then
-            echo "✓ Copied device tree files"
-        else
-            echo "⚠ Warning: Failed to copy some device tree files" >&2
-        fi
-    fi
-    
-    # Collect README and documentation
-    if [ -f "README.md" ]; then
-        if cp "README.md" "${OUTPUT_DIR}/device/README.md" 2>/dev/null; then
-            echo "✓ Copied README.md"
-        else
-            echo "⚠ Warning: Failed to copy README.md" >&2
-        fi
-    fi
-}
-
-# Function to process additional repositories
-process_additional_repos() {
-    if [ -n "${REPOS}" ]; then
-        echo ""
-        echo "=== Processing additional repositories ==="
-        
-        IFS=',' read -ra REPO_ARRAY <<< "$REPOS"
-        for repo in "${REPO_ARRAY[@]}"; do
-            repo=$(echo "$repo" | xargs) # Trim whitespace
-            if [ -n "$repo" ]; then
-                local temp_dir=$(mktemp -d)
-                if try_clone_repo "${repo}" "${temp_dir}"; then
-                    # Copy any relevant files
-                    copy_config_files "${temp_dir}" "${OUTPUT_DIR}/device"
-                fi
-                rm -rf "${temp_dir}"
-            fi
-        done
-    fi
-}
-
-# Main execution flow
-echo "Starting configuration collection..."
-
-# Try to collect NetHunter configurations first
-if ! collect_nethunter_configs; then
-    echo "NetHunter collection failed, proceeding with fallback..."
-fi
-
-# Provision PizzaG toolchain (fallback)
-if ! provision_pizzag_toolchain; then
-    echo "Warning: PizzaG toolchain provisioning failed"
-fi
-
-# Collect local device files
-collect_local_device_files
-
-# Process additional repositories if provided
-process_additional_repos
-
-# Create summary file
-cat > "${OUTPUT_DIR}/collection-summary.txt" <<EOF
-Device Configuration Collection Summary
-========================================
 Collection Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 Repository: $(git remote get-url origin 2>/dev/null || echo "unknown")
 Branch: $(git branch --show-current 2>/dev/null || echo "unknown")
@@ -294,3 +90,217 @@ find "${OUTPUT_DIR}" -type f | wc -l | xargs echo "  Total files:"
 du -sh "${OUTPUT_DIR}" | cut -f1 | xargs echo "  Total size:"
 echo ""
 echo "✓ Configuration collection completed successfully"
+echo "=== Device Configuration Collection ==="
+echo "Device: $DEVICE_BRAND $DEVICE_MODEL ($DEVICE_CODENAME)"
+echo "SoC: $DEVICE_SOC"
+echo "Kernel Version: $KERNEL_VERSION"
+echo "Toolchain: Clang $CLANG_VERSION / LLD $LLD_VERSION"
+echo ""
+
+# Create work and output directories
+mkdir -p "$WORK_DIR"
+mkdir -p "$OUTPUT_DIR"
+
+# Create metadata file
+METADATA_FILE="$OUTPUT_DIR/device-metadata.txt"
+cat > "$METADATA_FILE" << EOF
+Device Information
+Brand: $DEVICE_BRAND
+Model: $DEVICE_MODEL
+Codename: $DEVICE_CODENAME
+SoC: $DEVICE_SOC
+Kernel Version: $KERNEL_VERSION
+Toolchain: Clang $CLANG_VERSION / LLD $LLD_VERSION
+Collection Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+Build Timestamp: $(date +%s)
+
+Repositories Cloned
+EOF
+
+# Clone repositories
+if [ -n "$REPOS" ]; then
+    echo "=== Cloning Repositories ==="
+    IFS=',' read -ra REPO_ARRAY <<< "$REPOS"
+    for repo_url in "${REPO_ARRAY[@]}"; do
+        repo_url=$(echo "$repo_url" | xargs)  # trim whitespace
+        if [ -z "$repo_url" ]; then
+            continue
+        fi
+        
+        # Extract repo name from URL
+        repo_name=$(basename "$repo_url" .git)
+        echo "Cloning $repo_name from $repo_url..."
+        
+        cd "$WORK_DIR"
+        if [ -d "$repo_name" ]; then
+            echo "  Already exists, skipping..."
+        else
+            git clone --depth 1 "$repo_url" "$repo_name" || {
+                echo "  Warning: Failed to clone $repo_url"
+                continue
+            }
+        fi
+        
+        echo "$repo_url -> $repo_name" >> "$METADATA_FILE"
+    done
+    echo ""
+fi
+
+# Provision toolchain using PizzaG's Build-Env-Setup-Scripts
+echo "=== Provisioning Toolchain ==="
+if [ -d "$WORK_DIR/Build-Env-Setup-Scripts" ]; then
+    echo "Found Build-Env-Setup-Scripts repository"
+    cd "$WORK_DIR/Build-Env-Setup-Scripts"
+    
+    # Check for setup scripts
+    if [ -f "setup.sh" ] && [ -x "setup.sh" ]; then
+        echo "Running setup.sh..."
+        bash setup.sh || echo "Warning: setup.sh exited with non-zero status"
+    elif [ -f "setup.sh" ]; then
+        echo "setup.sh found but not executable, attempting to run with bash..."
+        bash setup.sh || echo "Warning: setup.sh exited with non-zero status"
+    fi
+    
+    if [ -f "install-toolchain.sh" ] && [ -x "install-toolchain.sh" ]; then
+        echo "Running install-toolchain.sh..."
+        bash install-toolchain.sh || echo "Warning: install-toolchain.sh exited with non-zero status"
+    elif [ -f "install-toolchain.sh" ]; then
+        echo "install-toolchain.sh found but not executable, attempting to run with bash..."
+        bash install-toolchain.sh || echo "Warning: install-toolchain.sh exited with non-zero status"
+    fi
+    
+    # Document toolchain setup
+    echo "" >> "$METADATA_FILE"
+    echo "Toolchain Setup" >> "$METADATA_FILE"
+    echo "===============" >> "$METADATA_FILE"
+    echo "Provisioned via: PizzaG/Build-Env-Setup-Scripts" >> "$METADATA_FILE"
+    echo "Scripts executed: setup.sh, install-toolchain.sh" >> "$METADATA_FILE"
+else
+    echo "Warning: Build-Env-Setup-Scripts not found in work directory"
+fi
+echo ""
+
+# Download kernel tarball
+if [ -n "$KERNEL_URL" ]; then
+    echo "=== Downloading Kernel Tarball ==="
+    KERNEL_TARBALL=$(basename "$KERNEL_URL")
+    echo "URL: $KERNEL_URL"
+    echo "File: $KERNEL_TARBALL"
+    
+    cd "$WORK_DIR"
+    if [ -f "$KERNEL_TARBALL" ]; then
+        echo "Tarball already exists, skipping download..."
+    else
+        curl -L -o "$KERNEL_TARBALL" "$KERNEL_URL" || {
+            echo "Warning: Failed to download kernel tarball"
+        }
+    fi
+    
+    if [ -f "$KERNEL_TARBALL" ]; then
+        echo "Extracting kernel tarball..."
+        tar -xf "$KERNEL_TARBALL" || echo "Warning: Failed to extract tarball"
+        
+        # Document kernel source
+        echo "" >> "$METADATA_FILE"
+        echo "Kernel Source" >> "$METADATA_FILE"
+        echo "=============" >> "$METADATA_FILE"
+        echo "URL: $KERNEL_URL" >> "$METADATA_FILE"
+        echo "File: $KERNEL_TARBALL" >> "$METADATA_FILE"
+    fi
+    echo ""
+fi
+
+# Collect device configurations
+echo "=== Collecting Device Configurations ==="
+cd "$WORK_DIR"
+
+# Collect from android_device_motorola_yume
+if [ -d "android_device_motorola_yume" ]; then
+    echo "Collecting from android_device_motorola_yume..."
+    mkdir -p "$OUTPUT_DIR/device"
+    find android_device_motorola_yume -name "*.mk" -o -name "*.prop" -o -name "*.rc" | while read -r file; do
+        dest_file="$OUTPUT_DIR/device/$file"
+        mkdir -p "$(dirname "$dest_file")"
+        cp "$file" "$dest_file" 2>/dev/null || true
+    done
+fi
+
+# Collect from android_vendor_motorola_yume
+if [ -d "android_vendor_motorola_yume" ]; then
+    echo "Collecting from android_vendor_motorola_yume..."
+    mkdir -p "$OUTPUT_DIR/vendor"
+    find android_vendor_motorola_yume -name "*.mk" -o -name "*.prop" | while read -r file; do
+        dest_file="$OUTPUT_DIR/vendor/$file"
+        mkdir -p "$(dirname "$dest_file")"
+        cp "$file" "$dest_file" 2>/dev/null || true
+    done
+fi
+
+# Collect kernel configurations
+if [ -d "platform_kernel_motorola_genevn" ]; then
+    echo "Collecting from platform_kernel_motorola_genevn..."
+    mkdir -p "$OUTPUT_DIR/kernel"
+    
+    # Copy defconfig files
+    find platform_kernel_motorola_genevn -name "*defconfig*" -o -name ".config" | while read -r file; do
+        dest_file="$OUTPUT_DIR/kernel/$file"
+        mkdir -p "$(dirname "$dest_file")"
+        cp "$file" "$dest_file" 2>/dev/null || true
+    done
+    
+    # Copy kernel makefiles
+    find platform_kernel_motorola_genevn -maxdepth 2 -name "Makefile" -o -name "Kconfig" | while read -r file; do
+        dest_file="$OUTPUT_DIR/kernel/$file"
+        mkdir -p "$(dirname "$dest_file")"
+        cp "$file" "$dest_file" 2>/dev/null || true
+    done
+fi
+
+# Collect NetHunter resources
+echo "Collecting NetHunter resources..."
+mkdir -p "$OUTPUT_DIR/nethunter"
+
+if [ -d "nh-resources" ]; then
+    echo "  Copying nh-resources..."
+    cp -r nh-resources "$OUTPUT_DIR/nethunter/" || true
+fi
+
+if [ -d "nh-scripts" ]; then
+    echo "  Copying nh-scripts..."
+    cp -r nh-scripts "$OUTPUT_DIR/nethunter/" || true
+fi
+
+if [ -d "kali-nethunter-installer" ]; then
+    echo "  Copying kali-nethunter-installer..."
+    cp -r kali-nethunter-installer "$OUTPUT_DIR/nethunter/" || true
+fi
+
+if [ -d "So_You_Want_To_Build_A_Nethunter_Kernel" ]; then
+    echo "  Copying So_You_Want_To_Build_A_Nethunter_Kernel..."
+    cp -r So_You_Want_To_Build_A_Nethunter_Kernel "$OUTPUT_DIR/nethunter/" || true
+fi
+
+if [ -d "kali-nethunter-pro" ]; then
+    echo "  Copying kali-nethunter-pro..."
+    cp -r kali-nethunter-pro "$OUTPUT_DIR/nethunter/" || true
+fi
+
+# Document NetHunter resources
+echo "" >> "$METADATA_FILE"
+echo "NetHunter Resources" >> "$METADATA_FILE"
+echo "===================" >> "$METADATA_FILE"
+echo "nh-resources: $([ -d 'nh-resources' ] && echo 'included' || echo 'not found')" >> "$METADATA_FILE"
+echo "nh-scripts: $([ -d 'nh-scripts' ] && echo 'included' || echo 'not found')" >> "$METADATA_FILE"
+echo "kali-nethunter-installer: $([ -d 'kali-nethunter-installer' ] && echo 'included' || echo 'not found')" >> "$METADATA_FILE"
+echo "So_You_Want_To_Build_A_Nethunter_Kernel: $([ -d 'So_You_Want_To_Build_A_Nethunter_Kernel' ] && echo 'included' || echo 'not found')" >> "$METADATA_FILE"
+echo "kali-nethunter-pro: $([ -d 'kali-nethunter-pro' ] && echo 'included' || echo 'not found')" >> "$METADATA_FILE"
+
+echo ""
+echo "=== Collection Summary ==="
+echo "Output directory: $OUTPUT_DIR"
+echo "Metadata file: $METADATA_FILE"
+echo ""
+echo "Collected configurations:"
+ls -lh "$OUTPUT_DIR"
+echo ""
+echo "Collection complete!"
