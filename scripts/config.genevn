@@ -2,7 +2,7 @@
 # Codename: genevn / G_Hunter
 # Chipset: SM6450 (Snapdragon 6 Gen 1)
 # Architecture: ARM64 (64-bit)
-# Kernel Source: MMI-T1TGNS33.60-41-2-7
+# Kernel Source: MMI-U1TGNS34.42-82-3-16
 
 chipset = "sm6450"
 
