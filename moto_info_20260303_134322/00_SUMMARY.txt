@@ -1,0 +1,13 @@
+=== ANDROID DEVICE INFORMATION SUMMARY ===
+Collection Date: Tue Mar  3 13:43:26 CST 2026
+Collection Timestamp: 20260303_134322
+
+=== DEVICE INFO ===
+
+=== CPU INFO (Summary) ===
+
+=== MEMORY INFO (Summary) ===
+
+=== STORAGE INFO ===
+
+Files saved in: /data/data/com.termux/files/home/Downloads/Moto_Information/moto_info_20260303_134322
